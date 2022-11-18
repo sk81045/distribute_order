@@ -112,7 +112,7 @@ func (c *Client) Read() {
 			fmt.Println("error:", err)
 		}
 		var redis controller.RedisStore
-		redis.SetList("38", msg)
+		redis.SetList("39", msg)
 		fmt.Println("Recived from client,data", Msg)
 		if Msg.Type == 2 {
 			c.id = Msg.Pid
@@ -178,7 +178,7 @@ func (c *Client) Ping() {
 		// msg := "ping ==>" + c.uuid.String()
 		I++
 		// redis.Set(fmt.Sprintf("%d", I), `"{"pid":1045,"money":10.5}"`)
-		redis.GetList("38")
+		redis.ListLPop("38")
 		msg := "ping..."
 		d := W(c.conn, msg)
 		if d != true {

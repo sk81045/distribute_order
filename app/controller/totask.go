@@ -48,14 +48,39 @@ func (rs *RedisStore) Scan(key string, limit int64) {
 	fmt.Println("keys:", keys)
 }
 
-func (rs *RedisStore) SetList(key string, val string) {
+func (rs *RedisStore) SetTo(key string, val string) {
 	keys := global.H_REDIS.SAdd(context.Background(), key, val)
 
+	fmt.Println("SetTo keys:", keys)
+}
+
+func (rs *RedisStore) GetTo(key string) {
+	keys := global.H_REDIS.SMembers(context.Background(), key)
+
+	fmt.Println("GetList keys:", keys)
+}
+
+func (rs *RedisStore) SetList(key string, val string) {
+	keys := global.H_REDIS.RPush(context.Background(), key, val)
 	fmt.Println("SetList keys:", keys)
 }
 
 func (rs *RedisStore) GetList(key string) {
-	keys := global.H_REDIS.SMembers(context.Background(), key)
+	val := global.H_REDIS.LRange(context.Background(), key, 0, -1).Val()
 
-	fmt.Println("GetList keys:", keys)
+	for _, i := range val {
+		fmt.Println("GetList keys:", i)
+	}
+
+	// fmt.Println("GetList val:", val)
+}
+
+func (rs *RedisStore) ListLPop(key string) {
+	val := global.H_REDIS.LRange(context.Background(), key, 0, -1).Val()
+	for _, i := range val {
+		err := global.H_REDIS.LRem(context.Background(), key, 1, i).Val()
+		fmt.Println("LPush:", err)
+	}
+
+	// fmt.Println("GetList val:", val)
 }
