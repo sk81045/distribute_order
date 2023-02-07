@@ -111,22 +111,37 @@ func (c *Client) Read() {
 		if err != nil {
 			fmt.Println("error:", err)
 		}
-		var redis controller.RedisStore
-		redis.SetList("39", msg)
+		// var redis controller.RedisStore
+		// redis.SetList("39", msg)
 		fmt.Println("Recived from client,data", Msg)
-		if Msg.Type == 2 {
+
+		switch Msg.Type {
+		case 1:
+			fmt.Println("ping")
+		case 2:
 			c.id = Msg.Pid
 			go c.Operations(c.id)
+		default:
+
 		}
 	}
 }
 
 func (c *Client) Operations(id int) {
 	var redis controller.RedisStore
+	item := &Message{
+		Type:     1,
+		Describe: "recharge",
+		Content:  `"{"pid":` + fmt.Sprintf("%d", id) + `,"card":265844,"money":10.5}"`,
+		Pid:      id,
+	}
+	items, _ := json.Marshal(item)
+	fmt.Println(string(items))
 	for {
+		// redis.Set(fmt.Sprintf("%d", id), string(items))
 		for conn := range manager.clients {
 			if conn.id == id {
-				rget := redis.Get(fmt.Sprintf("%d", I), false)
+				rget := redis.Get(fmt.Sprintf("%d", id), false)
 				// redis.Scan("*", 100)
 				fmt.Println("send=>", conn.id)
 				// conn.send <- []byte("Operations action!")
@@ -137,7 +152,7 @@ func (c *Client) Operations(id int) {
 				}
 			}
 		}
-		time.Sleep(3 * time.Second)
+		time.Sleep(31 * time.Second)
 	}
 	return
 }
@@ -172,13 +187,8 @@ func W(conn net.Conn, msg string) bool {
 }
 
 func (c *Client) Ping() {
-	var redis controller.RedisStore
 	for {
-		time.Sleep(3 * time.Second)
-		// msg := "ping ==>" + c.uuid.String()
-		I++
-		// redis.Set(fmt.Sprintf("%d", I), `"{"pid":1045,"money":10.5}"`)
-		redis.ListLPop("38")
+		time.Sleep(30 * time.Second)
 		msg := "ping..."
 		d := W(c.conn, msg)
 		if d != true {

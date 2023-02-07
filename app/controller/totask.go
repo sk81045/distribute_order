@@ -15,7 +15,6 @@ type RedisStore struct {
 }
 
 func (rs *RedisStore) Set(id string, value string) {
-	fmt.Println("ddd")
 	err := global.H_REDIS.Set(context.Background(), id, value, rs.Expiration).Err()
 	if err != nil {
 		global.H_LOG.Error("RedisStoreSetError!", zap.Error(err))
