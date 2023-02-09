@@ -2,6 +2,7 @@ package service
 
 import (
 	"Hwgen/app/controller"
+	helpers "Hwgen/utils"
 	proto "Hwgen/utils"
 	"bufio"
 	"encoding/json"
@@ -33,8 +34,10 @@ var manager = ClientManager{
 	unregister: make(chan *Client),
 	clients:    make(map[*Client]bool),
 }
+
 var (
-	I = 0
+	redis controller.RedisStore
+	api   controller.Api
 )
 
 func (manager *ClientManager) start() {
@@ -80,7 +83,6 @@ func Run() {
 			manager.register <- client
 			go client.Read()
 			go client.Write()
-			go client.Ping()
 		}
 	}
 }
@@ -121,6 +123,7 @@ func (c *Client) Read() {
 		case 2:
 			c.id = Msg.Pid
 			go c.Operations(c.id)
+			// go c.Ping(c.id)
 		default:
 
 		}
@@ -128,21 +131,30 @@ func (c *Client) Read() {
 }
 
 func (c *Client) Operations(id int) {
-	var redis controller.RedisStore
-	item := &Message{
-		Type:     1,
-		Describe: "recharge",
-		Content:  `"{"pid":` + fmt.Sprintf("%d", id) + `,"card":265844,"money":10.5}"`,
-		Pid:      id,
-	}
-	items, _ := json.Marshal(item)
-	fmt.Println(string(items))
+	// item := &Message{
+	// 	Type:     1,
+	// 	Describe: "recharge",
+	// 	Content:  `"{"pid":` + fmt.Sprintf("%d", id) + `,"card":265844,"money":10.5}"`,
+	// 	Pid:      id,
+	// }
+	// items, _ := json.Marshal(item)
+	// fmt.Println(string(items))
+	list_key := fmt.Sprintf("%d", id)
 	for {
-		// redis.Set(fmt.Sprintf("%d", id), string(items))
+
+		// llen := redis.LLen(list_key)
+		// if llen == 0 {
+		// 	continue
+		// }
+		// redis.LRange(list_key, llen, llen)
+		redis.LRpop(list_key)
+
+		// redis.BRPopLPush(list_key, 5*time.Second)
+
+		api.Send("ha ha")
 		for conn := range manager.clients {
 			if conn.id == id {
-				rget := redis.Get(fmt.Sprintf("%d", id), false)
-				// redis.Scan("*", 100)
+				rget := "test" // redis.Scan("*", 100)
 				fmt.Println("send=>", conn.id)
 				// conn.send <- []byte("Operations action!")
 				d := W(c.conn, rget)
@@ -152,7 +164,7 @@ func (c *Client) Operations(id int) {
 				}
 			}
 		}
-		time.Sleep(31 * time.Second)
+		time.Sleep(5 * time.Second)
 	}
 	return
 }
@@ -186,14 +198,27 @@ func W(conn net.Conn, msg string) bool {
 	return true
 }
 
-func (c *Client) Ping() {
+func (c *Client) Ping(id int) {
+	i := 1
+
 	for {
-		time.Sleep(30 * time.Second)
+		i++
+		time.Sleep(3 * time.Second)
+		item := &Message{
+			Type:     1,
+			Describe: "recharge",
+			Content:  `"{"pid":` + fmt.Sprintf("%d", id) + `,"card":` + helpers.RandStr(5) + `,"money":10.5}"`,
+			Pid:      id,
+			Sid:      i,
+		}
+		items, _ := json.Marshal(item)
+		redis.SetList(fmt.Sprintf("%d", id), string(items))
 		msg := "ping..."
 		d := W(c.conn, msg)
 		if d != true {
 			manager.unregister <- c
 			return
 		}
+
 	}
 }

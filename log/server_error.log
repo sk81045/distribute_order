@@ -1367,3 +1367,17 @@
 [hxb]2023/02/07 - 17:57:02.069	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
 [hxb]2023/02/07 - 17:57:31.973	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
 [hxb]2023/02/07 - 17:57:33.069	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
+[hxb]2023/02/07 - 18:00:28.030	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
+[hxb]2023/02/07 - 18:00:29.164	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
+[hxb]2023/02/07 - 18:00:59.031	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
+[hxb]2023/02/07 - 18:01:00.165	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
+[hxb]2023/02/07 - 18:01:30.034	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
+[hxb]2023/02/07 - 18:01:31.166	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
+[hxb]2023/02/07 - 18:02:01.038	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
+[hxb]2023/02/07 - 18:02:02.167	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
+[hxb]2023/02/07 - 18:02:32.039	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
+[hxb]2023/02/07 - 18:02:33.167	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
+[hxb]2023/02/08 - 17:52:24.225	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
+[hxb]2023/02/08 - 17:52:55.227	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
+[hxb]2023/02/08 - 17:53:26.231	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}
+[hxb]2023/02/08 - 17:53:57.236	[31merror[0m	/home/hxb/go/distribute_order/app/controller/totask.go:27	RedisStoreGetError!	{"error": "redis: nil"}

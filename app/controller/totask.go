@@ -60,18 +60,42 @@ func (rs *RedisStore) GetTo(key string) {
 }
 
 func (rs *RedisStore) SetList(key string, val string) {
-	keys := global.H_REDIS.RPush(context.Background(), key, val)
+	keys := global.H_REDIS.LPush(context.Background(), key, val)
 	fmt.Println("SetList keys:", keys)
 }
 
-func (rs *RedisStore) GetList(key string) {
-	val := global.H_REDIS.LRange(context.Background(), key, 0, -1).Val()
+func (rs *RedisStore) LRange(key string, start int64, end int64) {
+	val := global.H_REDIS.LRange(context.Background(), key, start-1, end).Val()
 
-	for _, i := range val {
-		fmt.Println("GetList keys:", i)
-	}
+	// for _, i := range val {
+	// 	fmt.Println("GetList keys:", i)
+	// }
 
-	// fmt.Println("GetList val:", val)
+	fmt.Println("LRange-->", start-1, end, val)
+}
+
+func (rs *RedisStore) BRPopLPush(key string, timeout time.Duration) {
+	val := global.H_REDIS.BRPopLPush(context.Background(), key, key+"_backup", timeout).Val()
+
+	// for _, i := range val {
+	// 	fmt.Println("rpop-->:", i)
+	// }
+
+	fmt.Println("LRPOPLPUSH-->", val)
+}
+
+func (rs *RedisStore) LLen(key string) (le int64) {
+	return global.H_REDIS.LLen(context.Background(), key).Val()
+}
+
+func (rs *RedisStore) LRpop(key string) {
+	val := global.H_REDIS.RPop(context.Background(), key).Val()
+
+	// for _, i := range val {
+	// 	fmt.Println("rpop-->:", i)
+	// }
+
+	fmt.Println("LPop-->", val)
 }
 
 func (rs *RedisStore) ListLPop(key string) {
