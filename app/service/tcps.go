@@ -1,19 +1,19 @@
 package service
 
 import (
-	"Hwgen/app/controller"
+	redis_method "Hwgen/app/controller/redis"
+	sellfood "Hwgen/app/controller/sellfood"
 	"Hwgen/app/model"
 	"Hwgen/global"
 	// helpers "Hwgen/utils"
 	"encoding/json"
 	"fmt"
-
 	"time"
 )
 
 var (
-	redis controller.RedisStore
-	api   controller.Api
+	redis redis_method.RedisStore
+	api   sellfood.Api
 )
 
 type Message struct {
@@ -28,7 +28,7 @@ func Run() {
 
 	Server()
 
-	list_key := "47"
+	list_key := "34"
 	for {
 		llen := redis.LLen(list_key)
 		order_list := redis.LRange(list_key, llen-1, llen)
@@ -38,16 +38,14 @@ func Run() {
 		// fmt.Println("LRange-->", order_list)
 		// redis.LRpop(list_key)
 		// redis.BRPopLPush(list_key, 5*time.Second)
-		res := api.Rechage(order_list[0])
-		// api.Token()
-		if res == "ok" {
+		ok := api.Mission(order_list[0])
+		if ok {
 			redis.LRpop(list_key)
 		} else {
 			redis.BRPopLPush(list_key, list_key+"err", 5*time.Second)
-
 			// redis.SetList("47err", order_list[0])
+			fmt.Println("操作失败-->", ok)
 		}
-		fmt.Println("res-->", res)
 
 		time.Sleep(3 * time.Second)
 	}
@@ -71,31 +69,30 @@ func Addlist(sid int) {
 		list := Payorder(sid)
 		for _, i := range list {
 			items, _ := json.Marshal(i)
-			redis.SetList(fmt.Sprintf("%d", sid), string(items))
-			fmt.Println("Save-->", i)
-			Save(i.ID)
+			ok := redis.SetList(fmt.Sprintf("%d", sid), string(items))
+			if ok {
+				fmt.Println("redis SetList ok")
+				Save(i.ID)
+			} else {
+				fmt.Println("redis setlist err")
+			}
 		}
 	}
 }
 
 func Save(id int) {
-	global.H_DB.Model(&model.Payorder{}).Where("id = ?", id).Update("sync", 1)
+	result := global.H_DB.Model(&model.Payorder{}).Where("id = ?", id).Update("sync", 1)
+	fmt.Println("Save-->", result.Error)
 }
 
 func Payorder(sid int) []model.Payorder {
 	var list = []model.Payorder{}
-	_ = global.H_DB.Model(&model.Payorder{}).Where("`sid` = ? AND `sync` = ? ", sid, 0).Limit(5).Find(&list).Error
-	// if list.ID == 0 {
-	// 	// panic("func Payorder():没有获取到此设备信息")
-	// }
+	_ = global.H_DB.Model(&model.Payorder{}).Preload("Students").Where("`sid` = ? AND `sync` = ? AND `price` > ?", sid, 0, 0).Limit(5).Find(&list).Error
 	return list
 }
 
 func School() []model.School {
 	var school_list = []model.School{}
 	_ = global.H_DB.Model(&model.School{}).Find(&school_list).Error
-	// if list.ID == 0 {
-	// 	// panic("func Payorder():没有获取到此设备信息")
-	// }
 	return school_list
 }

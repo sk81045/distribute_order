@@ -4,7 +4,7 @@ type Students struct {
 	ID         int
 	Sid        int       `gorm:"column:sid"`
 	Name       string    `gorm:"column:name"`
-	Studentid  string    `gorm:"column:studentid"`
+	Studentid  int       `gorm:"column:studentid"`
 	Balance    float32   `gorm:"column:balance"`
 	Cardid     string    `gorm:"column:cardid"`
 	Grade      string    `gorm:"column:grade"`
