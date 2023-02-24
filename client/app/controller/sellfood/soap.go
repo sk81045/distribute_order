@@ -13,10 +13,6 @@ import (
 	"time"
 )
 
-var (
-	icard = "2914207747"
-)
-
 type Soap struct {
 }
 
@@ -62,20 +58,20 @@ func (sp *Soap) Mission(value string) (ok bool) {
 }
 
 func (sp *Soap) AddRecord(order model.Payorder, mhd string) bool { //二十三、添加交易记录接口
+	MacId := global.H_CONFIG.System.MacId
 	Body := SoapRechargeParams{ //充值报文
 		AccountID: order.Studentid,
 		CardID:    order.Ic,
 		PayMoney:  order.Price,
 		PayTime:   time.Unix(order.Created_at, 0).Format("2006-01-02 15:04:05"),
-		MacID:     "1",
+		MacID:     MacId,
 		MacType:   "app",
 		PayKind:   mhd,
 		OrderNO:   order.Orderid,
 	}
-	fmt.Println("Body", Body)
 	jsonByte, _ := json.Marshal(Body)
 	Soaps := string(jsonByte)
-
+	fmt.Println("Soaps", Soaps)
 	reqBody := `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"  xmlns:xsd="http://www.w3.org/2001/XMLSchema"  xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
 <soap:Body>
@@ -85,7 +81,6 @@ func (sp *Soap) AddRecord(order model.Payorder, mhd string) bool { //二十三�
 </soap:Body>
 </soap:Envelope>`
 	URL := global.H_CONFIG.System.SellfoodSoap
-
 	res, err := http.Post(URL, "text/xml; charset=UTF-8", strings.NewReader(reqBody))
 	if nil != err {
 		fmt.Println("http post err:", err)

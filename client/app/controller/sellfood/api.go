@@ -86,7 +86,7 @@ func (rs *Api) Deduction(order model.Payorder) bool { //扣费
 		MemberID:        "",
 		MemberNo:        order.Students.Studentid,
 		ConsumptionTime: t.Format("20060102150405"),
-		TerminalNo:      "100",
+		TerminalNo:      "25",
 		Amount:          order.Price,
 		SubsidiesAmount: 0,
 		GiftAmount:      0,

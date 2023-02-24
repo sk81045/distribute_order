@@ -14,6 +14,7 @@ type System struct {
 	LimitTimeIP       int    `mapstructure:"iplimit-time" json:"iplimitTime" yaml:"iplimit-time"`
 	School            string `mapstructure:"school" json:"school" yaml:"school"`
 	SchoolId          string `mapstructure:"school-id" json:"school-id" yaml:"school-id"`
+	MacId             string `mapstructure:"mac-id" json:"mac-id" yaml:"mac-id"`
 	SellfoodApiType   string `mapstructure:"sellfood-api-type" json:"sellfood-api-type" yaml:"sellfood-api-type"`
 	SellfoodApiurl    string `mapstructure:"sellfood-apiurl" json:"sellfood-apiurl" yaml:"sellfood-apiurl"`
 	SellfoodAppid     string `mapstructure:"sellfood-appid" json:"sellfood-appid" yaml:"sellfood-appid"`

@@ -59,6 +59,6 @@ func Client(sid string, apitype string) {
 			global.H_LOG.Warn("Order failed!", zap.String("", order_list[0]))
 		}
 
-		time.Sleep(3 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 }
