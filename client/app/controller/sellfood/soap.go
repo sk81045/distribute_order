@@ -16,17 +16,6 @@ import (
 type Soap struct {
 }
 
-type SoapRechargeParams struct { //通过webserver接口充值时，需引用的结构体
-	AccountID int     `json:"AccountID"`
-	CardID    string  `json:"CardID"`
-	PayMoney  float32 `json:"PayMoney"`
-	PayTime   string  `json:"PayTime"`
-	MacID     string  `json:"MacID"`
-	MacType   string  `json:"MacType"`
-	PayKind   string  `json:"PayKind"`
-	OrderNO   string  `json:"OrderNO"`
-}
-
 //============解析XML start=====================
 type MyRespEnvelope struct {
 	XMLName xml.Name `xml:"http://schemas.xmlsoap.org/soap/envelope/ Envelope"`
@@ -58,13 +47,12 @@ func (sp *Soap) Mission(value string) (ok bool) {
 }
 
 func (sp *Soap) AddRecord(order model.Payorder, mhd string) bool { //二十三、添加交易记录接口
-	MacId := global.H_CONFIG.System.MacId
-	Body := SoapRechargeParams{ //充值报文
+	Body := model.SoapRechargeParams{ //交易记录报文
 		AccountID: order.Studentid,
 		CardID:    order.Ic,
 		PayMoney:  order.Price,
 		PayTime:   time.Unix(order.Created_at, 0).Format("2006-01-02 15:04:05"),
-		MacID:     MacId,
+		MacID:     order.Macid,
 		MacType:   "app",
 		PayKind:   mhd,
 		OrderNO:   order.Orderid,

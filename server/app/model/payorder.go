@@ -6,20 +6,21 @@ import (
 
 type Payorder struct {
 	ID         int
-	Sid        int      `gorm:"column:sid"`
-	Pid        int      `gorm:"column:pid"`
-	Lid        int      `gorm:"column:lid"`
-	Studentid  int      `gorm:"column:student_id"`
-	Ic         string   `gorm:"column:ic"`
-	Orderid    string   `gorm:"column:orderid"`
-	Price      float32  `gorm:"column:price"`
-	Type       int      `gorm:"column:type"`
-	From       string   `gorm:"column:from"`
-	Paystatus  bool     `gorm:"column:paystatus"`
-	Category   string   `gorm:"column:category"`
-	Sync       bool     `gorm:"column:sync"`
-	Created_at int64    `gorm:"column:created_at"`
-	Students   Students `gorm:"foreignKey:id;references:pid"`
+	Sid        int     `gorm:"column:sid"`
+	Pid        int     `gorm:"column:pid"`
+	Lid        int     `gorm:"column:lid"`
+	Studentid  int     `gorm:"column:student_id"`
+	Ic         string  `gorm:"column:ic"`
+	Orderid    string  `gorm:"column:orderid"`
+	Macid      string  `gorm:"column:macid"`
+	Price      float32 `gorm:"column:price"`
+	Type       int     `gorm:"column:type"`
+	From       string  `gorm:"column:from"`
+	Paystatus  bool    `gorm:"column:paystatus"`
+	Category   string  `gorm:"column:category"`
+	Sync       bool    `gorm:"column:sync"`
+	Created_at int64   `gorm:"column:created_at"`
+	// Students   Students `gorm:"foreignKey:id;references:pid"`
 }
 
 func (Payorder) TableName() string {

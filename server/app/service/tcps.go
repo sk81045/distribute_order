@@ -93,7 +93,7 @@ func Save(id int) {
 
 func Payorder(sid int) []model.Payorder {
 	var list = []model.Payorder{}
-	_ = global.H_DB.Model(&model.Payorder{}).Preload("Students").Where("`sid` = ? AND `sync` = ? AND `price` > ?", sid, 0, 0).Limit(50).Find(&list).Error
+	_ = global.H_DB.Model(&model.Payorder{}).Where("`sid` = ? AND `sync` = ? AND `price` > ?", sid, 0, 0).Limit(50).Find(&list).Error
 	return list
 }
 

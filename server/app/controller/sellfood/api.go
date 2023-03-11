@@ -53,7 +53,7 @@ func (rs *Api) Rechage(order model.Payorder) (ok bool) { //充值
 	requestBody := RechargeApiParams{ //充值报文
 		MerchantID:     "admin",
 		MemberID:       "",
-		MemberNo:       order.Students.Studentid,
+		MemberNo:       order.Studentid,
 		PayTime:        t.Format("20060102150405"),
 		PayType:        "2",
 		Amount:         order.Price,
@@ -70,10 +70,10 @@ func (rs *Api) Rechage(order model.Payorder) (ok bool) { //充值
 	}
 
 	if ReqMsg.Success == true {
-		fmt.Printf("\033[32;4mid %d:%s-> +%f\033[0m\n", order.Students.Studentid, ReqMsg.Message, order.Price)
+		fmt.Printf("\033[32;4mid %d:%s-> +%f\033[0m\n", order.Studentid, ReqMsg.Message, order.Price)
 		return true
 	} else {
-		fmt.Printf("\033[7;31;40mid %d:%s\033[0m\n", order.Students.Studentid, ReqMsg.Message)
+		fmt.Printf("\033[7;31;40mid %d:%s\033[0m\n", order.Studentid, ReqMsg.Message)
 		return false
 	}
 }
@@ -84,7 +84,7 @@ func (rs *Api) Deduction(order model.Payorder) bool { //扣费
 	requestBody := model.DeductionParams{
 		MerchantID:      "admin",
 		MemberID:        "",
-		MemberNo:        order.Students.Studentid,
+		MemberNo:        order.Studentid,
 		ConsumptionTime: t.Format("20060102150405"),
 		TerminalNo:      "100",
 		Amount:          order.Price,
@@ -104,10 +104,10 @@ func (rs *Api) Deduction(order model.Payorder) bool { //扣费
 	}
 
 	if ReqMsg.Success == true {
-		fmt.Printf("\033[32;4mid %d:%s-> -%f\033[0m\n", order.Students.Studentid, ReqMsg.Message, order.Price)
+		fmt.Printf("\033[32;4mid %d:%s-> -%f\033[0m\n", order.Studentid, ReqMsg.Message, order.Price)
 		return true
 	} else {
-		fmt.Printf("\033[7;31;40mid %d:%s\033[0m\n", order.Students.Studentid, ReqMsg.Message)
+		fmt.Printf("\033[7;31;40mid %d:%s\033[0m\n", order.Studentid, ReqMsg.Message)
 		return false
 	}
 }
