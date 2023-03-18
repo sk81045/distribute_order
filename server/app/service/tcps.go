@@ -9,12 +9,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"go.uber.org/zap"
+	"sync"
 	"time"
 )
 
 var (
 	redis redis_method.RedisStore
 	api   sellfood.Api
+	mu    sync.Mutex
 )
 
 type Message struct {
@@ -27,39 +29,11 @@ type Message struct {
 
 func Run() {
 	Server()
-	// system := global.H_CONFIG.System
-	// sid := system.SchoolId //学校ID
-	// fmt.Println("User:", system.School, "ID:", sid)
-	// Client(sid)
-}
-
-func Client(sid string) {
-	list_key := sid //学校ID
-	for {
-		llen := redis.LLen(list_key)
-		order_list := redis.LRange(list_key, llen-1, llen)
-		if len(order_list) == 0 {
-			continue
-		}
-		ok := api.Mission(order_list[0])
-		if ok {
-			redis.LRpop(list_key)
-			global.H_LOG.Info("Successfully->", zap.String("", order_list[0]))
-		} else {
-			redis.BRPopLPush(list_key, list_key+"err", 5*time.Second)
-			global.H_LOG.Warn("Order failed!", zap.String("", order_list[0]))
-		}
-
-		time.Sleep(3 * time.Second)
-	}
-
 }
 
 func Server() {
-
 	school_list_key := School()
 	for _, s := range school_list_key {
-
 		go Addlist(s.ID)
 		fmt.Println("学校-->", s.Name)
 	}
@@ -87,11 +61,25 @@ func Addlist(sid int) {
 	}
 }
 
+// func ErrOrder() {
+// 	for {
+// 		school_list_key := School()
+// 		for _, s := range school_list_key {
+// 			go Addlist(s.ID)
+// 			fmt.Println("学校-->", s.Name)
+// 		}
+// 	}
+// }
+
 func Save(id int) {
+	mu.Lock()
+	defer mu.Unlock()
 	global.H_DB.Model(&model.Payorder{}).Where("id = ?", id).Update("sync", 1)
 }
 
 func Payorder(sid int) []model.Payorder {
+	mu.Lock()
+	defer mu.Unlock()
 	var list = []model.Payorder{}
 	_ = global.H_DB.Model(&model.Payorder{}).Where("`sid` = ? AND `sync` = ? AND `price` > ?", sid, 0, 0).Limit(50).Find(&list).Error
 	return list
