@@ -35,7 +35,7 @@ func Server() {
 	school_list_key := School()
 	for _, s := range school_list_key {
 		go Addlist(s.ID)
-		fmt.Println("学校-->", s.Name)
+		fmt.Println("客户端加入-->", s.Name)
 	}
 	for {
 
@@ -51,9 +51,10 @@ func Addlist(sid int) {
 			items, _ := json.Marshal(i)
 			ok := redis.SetList(fmt.Sprintf("%d", sid), string(items))
 			if ok {
-				Save(i.ID)
+				SaveSync(i.ID)
 				fmt.Printf("Order added to queue successfully id:%d, school_id:%d\n", i.ID, i.Sid)
 			} else {
+				redis.BRPopLPush(fmt.Sprintf("%d", sid), fmt.Sprintf("%d", sid)+"SetListErr", 5*time.Second)
 				fmt.Println("Redis setlist failed id:", i.ID)
 				global.H_LOG.Warn("订单加入队列失败!:", zap.String("redis setlist method err:", string(items)))
 			}
@@ -71,7 +72,7 @@ func Addlist(sid int) {
 // 	}
 // }
 
-func Save(id int) {
+func SaveSync(id int) {
 	mu.Lock()
 	defer mu.Unlock()
 	global.H_DB.Model(&model.Payorder{}).Where("id = ?", id).Update("sync", 1)
@@ -81,7 +82,7 @@ func Payorder(sid int) []model.Payorder {
 	mu.Lock()
 	defer mu.Unlock()
 	var list = []model.Payorder{}
-	_ = global.H_DB.Model(&model.Payorder{}).Where("`sid` = ? AND `sync` = ? AND `price` > ?", sid, 0, 0).Limit(50).Find(&list).Error
+	_ = global.H_DB.Model(&model.Payorder{}).Where("`paystatus` = ? AND `sid` = ? AND `sync` = ? AND `price` > ?", 0, sid, 0, 0).Limit(50).Find(&list).Error
 	return list
 }
 

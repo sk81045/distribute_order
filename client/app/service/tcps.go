@@ -14,7 +14,7 @@ var (
 	redis redis_method.RedisStore
 	api   sellfood.Api
 	soap  sellfood.Soap
-	lock  bool
+	lock  = false
 )
 
 type Message struct {
@@ -40,30 +40,30 @@ func Client(sid string, apitype string) {
 			fmt.Println("接口错误: var lock = true")
 			continue
 		}
-		llen := redis.LLen(list_key)
-		order_list := redis.LRange(list_key, llen-1, llen)
-		if len(order_list) == 0 {
+		if redis.LLen(list_key) == 0 {
 			continue
 		}
 
+		order_list := redis.BRPopLPush(list_key, list_key+"ChargeBuffer", 5*time.Second)
+		fmt.Println("order_list", order_list)
 		ok := false
-		if apitype == "api" {
-			fmt.Println("api")
-			ok = api.Mission(order_list[0])
-		} else {
-			fmt.Println("soap")
-			ok = soap.Mission(order_list[0])
-		}
 		lock = true
-		if ok {
-			redis.LRpop(list_key)
-			// global.H_LOG.Info("Successfully->", zap.String("", order_list[0]))
+		if apitype == "api" {
+			fmt.Println("type->api")
+			ok = api.Mission(order_list)
 			lock = false
 		} else {
-			redis.BRPopLPush(list_key, list_key+"err", 5*time.Second)
-			global.H_LOG.Warn("Order failed!", zap.String("", order_list[0]))
+			fmt.Println("type->soap")
+			ok = soap.Mission(order_list)
 			lock = false
 		}
-		time.Sleep(3 * time.Second)
+
+		if ok {
+			redis.LRpop(list_key + "ChargeBuffer")
+		} else {
+			redis.BRPopLPush(list_key+"ChargeBuffer", list_key+"ChargeErr", 5*time.Second)
+			global.H_LOG.Warn("Order failed!", zap.String("", order_list))
+		}
+		time.Sleep(5 * time.Second)
 	}
 }

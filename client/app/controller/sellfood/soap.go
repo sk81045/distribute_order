@@ -102,7 +102,6 @@ func (sp *Soap) AddRecord(order model.Payorder, mhd string) bool { //二十三�
 	fmt.Println("response", string(items))
 	if ee.ErrorID == 0 && ee.ErrorMsg == "交易成功" {
 		return true
-	} else {
-		return false
 	}
+	return false
 }

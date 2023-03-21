@@ -77,22 +77,16 @@ func (rs *RedisStore) LRange(key string, start int64, end int64) (val []string) 
 
 }
 
-func (rs *RedisStore) BRPopLPush(key1 string, key2 string, timeout time.Duration) {
-	val := global.H_REDIS.BRPopLPush(context.Background(), key1, key2, timeout).Val()
-
-	// for _, i := range val {
-	// 	fmt.Println("rpop-->:", i)
-	// }
-
-	fmt.Println("LRPOPLPUSH-->", val)
+func (rs *RedisStore) BRPopLPush(key1 string, key2 string, timeout time.Duration) (val string) {
+	return global.H_REDIS.BRPopLPush(context.Background(), key1, key2, timeout).Val()
 }
 
 func (rs *RedisStore) LLen(key string) (le int64) {
 	return global.H_REDIS.LLen(context.Background(), key).Val()
 }
 
-func (rs *RedisStore) LRpop(key string) {
-	global.H_REDIS.RPop(context.Background(), key).Val()
+func (rs *RedisStore) LRpop(key string) (val string) {
+	return global.H_REDIS.RPop(context.Background(), key).Val()
 
 	// for _, i := range val {
 	// 	fmt.Println("rpop-->:", i)
