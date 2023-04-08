@@ -63,6 +63,6 @@ func Viper(path ...string) *viper.Viper {
 	fmt.Println("说明:", global.H_CONFIG.System.UpdateLog)
 	fmt.Println("USER:", global.H_CONFIG.System.School)
 	fmt.Println("UID:", global.H_CONFIG.System.SchoolId)
-	fmt.Println("MacID:", global.H_CONFIG.System.MacId)
+	fmt.Println("等待时间:", global.H_CONFIG.System.SleepTime, "s")
 	return v
 }
