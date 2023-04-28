@@ -14,6 +14,7 @@ var (
 	redis redis_method.RedisStore
 	api   sellfood.Api
 	soap  sellfood.Soap
+	song  sellfood.Song
 	lock  = false
 )
 
@@ -48,15 +49,29 @@ func Client(sid string, apitype string, sleep_time int) {
 		fmt.Println("order_list", order_list)
 		ok := false
 		lock = true
-		if apitype == "new" {
+		switch apitype {
+		case "new":
 			fmt.Println("type->api")
 			ok = api.Mission(order_list)
 			lock = false
-		} else {
-			fmt.Println("type->soap")
+		case "old":
+			fmt.Println("type->old")
 			ok = soap.Mission(order_list)
 			lock = false
+		default:
+			fmt.Println("type->songme")
+			ok = song.Mission(order_list)
+			lock = false
 		}
+		// if apitype == "new" {
+		// 	fmt.Println("type->api")
+		// 	ok = api.Mission(order_list)
+		// 	lock = false
+		// } else {
+		// 	fmt.Println("type->soap")
+		// 	ok = soap.Mission(order_list)
+		// 	lock = false
+		// }
 
 		if ok {
 			redis.BRPopLPush(list_key+"ChargeBuffer", "ChargeDone", 5*time.Second) //add to done list

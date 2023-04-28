@@ -6,6 +6,7 @@ import (
 	"Hwgen/global"
 	"fmt"
 	"gorm.io/driver/mysql"
+	"gorm.io/driver/sqlserver"
 )
 
 // Gorm 初始化数据库并产生数据库全局变量
@@ -14,8 +15,7 @@ func Gorm() *gorm.DB {
 	case "mysql":
 		return GormMysql()
 	case "mssql":
-		return nil
-		//以后支持
+		return GormMssql()
 	default:
 		return GormMysql()
 	}
@@ -35,6 +35,30 @@ func GormMysql() *gorm.DB {
 
 	if db, err := gorm.Open(mysql.New(mysqlConfig)); err != nil {
 		fmt.Println("数据库连接失败", mysqlConfig)
+		return nil
+	} else {
+		sqlDB, _ := db.DB()
+		sqlDB.SetMaxIdleConns(m.MaxIdleConns)
+		sqlDB.SetMaxOpenConns(m.MaxOpenConns)
+		fmt.Println("数据库已连接")
+		return db
+	}
+}
+
+//  初始化sqlServer数据库
+func GormMssql() *gorm.DB {
+	m := global.H_CONFIG.Mssql
+
+	if m.Dbname == "" {
+		return nil
+	}
+	fmt.Println("Dbname", m.Dbname)
+	mssqlConfig := sqlserver.Config{
+		DSN: m.Dsn(), // DSN data source name
+	}
+	fmt.Println("Dsn", mssqlConfig.DSN)
+	if db, err := gorm.Open(sqlserver.Open(mssqlConfig.DSN), &gorm.Config{}); err != nil {
+		fmt.Println("数据库连接失败", err)
 		return nil
 	} else {
 		sqlDB, _ := db.DB()
