@@ -35,13 +35,13 @@ func (rs *Song) Rechage(order model.Payorder) (ok bool) { //充值
 	now := time.Now()
 	var blance = employee.AfterPay + order.Price
 	var chargeData = model.MChargeRecords{
-		Clockid:     0,
+		Clockid:     order.Macid,
 		Empid:       employee.UserNO,
-		Opdate:      now.Format("2006-01-02 15:03:04"),
+		Opdate:      now.Format("2006-01-02 15:04:05"),
 		CardSequ:    employee.CardSequ + 1,
 		ChargeMoney: order.Price,
 		CardBalance: blance,
-		ChargeKind:  "0",
+		ChargeKind:  "6",
 		Cardid:      order.Orderid,
 		Accountid:   employee.UserNO,
 	}
@@ -53,29 +53,33 @@ func (rs *Song) Rechage(order model.Payorder) (ok bool) { //充值
 }
 
 func (rs *Song) Deduction(order model.Payorder) bool { //扣费
-	fmt.Println("Deduction->", order)
 	var employee = model.Employee{}
 	global.H_DB.Model(&model.Employee{}).Where("Emp_id = ? ", order.Studentid).Find(&employee)
 	fmt.Println("employee->", employee)
 
 	now := time.Now()
 	var blance = employee.AfterPay - order.Price
-	var chargeData = model.MChargeRecords{
-		Clockid:     0,
-		Empid:       employee.UserNO,
-		Opdate:      now.Format("2006-01-02 15:03:04"),
-		CardSequ:    employee.CardSequ + 1,
-		ChargeMoney: order.Price,
-		CardBalance: blance,
-		ChargeKind:  "0",
-		Cardid:      order.Orderid,
-		Accountid:   employee.UserNO,
+	var MealData = model.MealRecords{
+		Clockid:        order.Macid,
+		Empid:          employee.UserNO,
+		Opdate:         now.Format("2006-01-02 15:04:05"),
+		GetTime:        now.Format("2006-01-02 15:03:04"),
+		CardSequ:       employee.CardSequ + 1,
+		ChargeMoney:    order.Price,
+		SubsidyConsume: 0,
+		CardBalance:    blance,
+		ChargeKind:     "2",
+		Cardid:         order.Orderid,
+		Accountid:      employee.UserNO,
 	}
 
-	dd := AddRecords(chargeData) //增加记录
+	result := global.H_DB.Create(&MealData)
+	if result.Error != nil {
+		panic("func AddRecords():处理交易记录失败")
+	}
 
 	UpdateEmployee(employee.UserNO, blance, employee.CardSequ+1) //更新人事表
-	return dd
+	return true
 }
 
 func AddRecords(data model.MChargeRecords) bool {

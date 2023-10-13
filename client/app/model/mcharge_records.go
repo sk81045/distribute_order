@@ -13,7 +13,7 @@ charge_kind：类型 0现金,1补贴,2支付宝,3微信,4现金取款,5补贴取
 package model
 
 type MChargeRecords struct {
-	Clockid     int     `gorm:"column:clock_id"`
+	Clockid     string  `gorm:"column:clock_id"`
 	Empid       string  `gorm:"column:emp_id"`
 	Opdate      string  `gorm:"column:op_date"`
 	CardSequ    int     `gorm:"column:card_sequ"`
