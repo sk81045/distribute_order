@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"goskeleton/app/global/consts"
-	"goskeleton/app/model"
 	"goskeleton/app/utils/response"
 )
 
@@ -31,21 +30,6 @@ func (u *Home) News(context *gin.Context) {
 		"content":  "门户新闻内容001",
 	})
 
-}
-
-// 消费记录
-func (u *Home) List(context *gin.Context) {
-	pid := context.GetString(consts.ValidatorPrefix + "pid")
-	stime := context.GetString(consts.ValidatorPrefix + "stime")
-	etime := context.GetString(consts.ValidatorPrefix + "etime")
-	fmt.Println("pse", pid, stime, etime)
-	showlist := model.MealRecordsFactory("").List(pid, stime, etime)
-	if showlist != nil {
-		response.Success(context, consts.CurdStatusOkMsg, gin.H{"list": showlist})
-	} else {
-		fmt.Println("Fail")
-		response.Fail(context, consts.CurdSelectFailCode, consts.CurdSelectFailMsg, "")
-	}
 }
 
 // 消费记录

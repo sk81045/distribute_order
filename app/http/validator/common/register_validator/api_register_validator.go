@@ -3,6 +3,7 @@ package register_validator
 import (
 	"goskeleton/app/core/container"
 	"goskeleton/app/global/consts"
+	"goskeleton/app/http/validator/api/dealings"
 	"goskeleton/app/http/validator/api/home"
 )
 
@@ -19,8 +20,8 @@ func ApiRegisterValidator() {
 	containers.Set(key, home.News{})
 
 	key = consts.ValidatorPrefix + "List"
-	containers.Set(key, home.List{})
+	containers.Set(key, dealings.Record{})
 
-	key = consts.ValidatorPrefix + "PeopleInfo"
+	key = consts.ValidatorPrefix + "UserInfo"
 	containers.Set(key, home.PeopleInfo{})
 }

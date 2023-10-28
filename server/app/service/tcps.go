@@ -34,9 +34,11 @@ func Run() {
 func Server() {
 	school_list_key := School()
 	for _, s := range school_list_key {
+		time.Sleep(2 * time.Second)
 		go Addlist(s.ID)
 		fmt.Println("客户端加入-->", s.Name)
 	}
+	// go Addlist(34)
 	for {
 
 	}
@@ -44,7 +46,7 @@ func Server() {
 
 func Addlist(sid int) {
 	for {
-		time.Sleep(5 * time.Second)
+		time.Sleep(10 * time.Second)
 
 		list := Payorder(sid)
 		for _, i := range list {

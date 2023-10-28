@@ -21,6 +21,7 @@ get_time：采集时间
 */
 type MealRecords struct {
 	BaseModel
+	ID          int     `gorm:"column:ID"`
 	Clockid     int     `gorm:"column:clock_id"`
 	Empid       string  `gorm:"column:emp_id"`
 	Opdate      string  `gorm:"column:sign_time"`
@@ -39,7 +40,7 @@ func (MealRecords) TableName() string {
 
 // // // 查询（根据关键词模糊查询）
 func (m *MealRecords) List(empID string, Stime string, Etime string) (temp []MealRecords) {
-	sql := `SELECT * FROM MealRecords WHERE emp_id = ? AND sign_time between ? AND ? ORDER BY ID DESC`
+	sql := `SELECT * FROM MealRecordsReal WHERE emp_id = ? AND sign_time between ? AND ? ORDER BY ID DESC`
 	if res := m.Raw(sql, empID, Stime, Etime).Find(&temp); res.RowsAffected > 0 {
 		return temp
 	}
