@@ -54,7 +54,7 @@ func (manager *Yhcv2) Run(list_key string, secret string, order interface{}) {
 	manager.Cope2 = make(chan int, 3) //任务执行信号
 	manager.Count = make([]int64, 3)  //任务计数器
 	/*******************************************************************/
-	go manager.failOrderProcess()
+	go manager.FailOrderProcess()
 	for {
 		select {
 		case <-manager.Cope:
@@ -87,20 +87,21 @@ func (manager *Yhcv2) Run(list_key string, secret string, order interface{}) {
 				manager.Count[0]++
 			} else {
 				//交易失败
-				failOrder(list_key, order)
+				manager.failOrder(list_key, order)
 				fmt.Println("=====================start=============================")
 				fmt.Printf("交易失败!|%s%f|订单号:%s|用户编号:%d \n", msg, payorder.Price, payorder.Orderid, payorder.Studentid)
 				fmt.Println("======================end==============================")
 				manager.Count[1]++
-				time.Sleep((100 * time.Duration(manager.Count[1])) * time.Millisecond)
-				if manager.Count[1] == 5 { //异常订单重发次数超出限制
+				//！！！异常订单处理 在这里设置重发次数和时间间隔
+				time.Sleep((1000 * time.Duration(manager.Count[1])) * time.Millisecond)
+				if manager.Count[1] == 10 {
 					fmt.Printf("重试次数超出限制机 %d 加入错误订单\n", manager.Count[1])
 					manager.BadOrderProcess(payorder, pay_error)
 					manager.Count[1] = 0
 				}
 			}
 
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 			fmt.Printf("操作成功 %d 条订单\n", manager.Count[0])
 
 		default:
@@ -124,13 +125,12 @@ func (h *Yhcv2) BadOrderProcess(bad_order model.Payorder, err_msg error) {
 	RedisClient.Int64(RedisClient.Execute("LREM", h.List_key+"Backups", 0, h.Order))
 }
 
-func (h *Yhcv2) failOrderProcess() {
+func (h *Yhcv2) FailOrderProcess() {
 	redisClient := redis_factory.GetOneRedisClient()
 	for {
 		select {
 		case <-h.Cope:
-			fmt.Println("等待订单...........................................................")
-
+			fmt.Println("等待订单")
 			continue
 		default:
 			fmt.Println("同步处理异常订单.....")
@@ -145,13 +145,10 @@ func (h *Yhcv2) failOrderProcess() {
 				fmt.Println("异常订单出栈失败:2", err)
 			}
 
-			// time.Sleep(1000 * time.Millisecond)
-
 			_, err = redisClient.Int64(redisClient.Execute("RPUSH", h.List_key, res[h.List_key+"OrderFail"]))
 			if err != nil {
 				fmt.Println("处理异常订单失败:3", err)
 			}
-			h.Count[2]++
 		}
 	}
 }
@@ -196,7 +193,6 @@ func (h *Yhcv2) Process(order model.Payorder) error {
 	default:
 		return fmt.Errorf("接口错误 非预期返回值")
 	}
-	// return nil
 }
 
 func (h *Yhcv2) Recharge(order model.Payorder) error {
@@ -209,14 +205,16 @@ func (h *Yhcv2) Recharge(order model.Payorder) error {
 		PayType:        "2",
 		Amount:         order.Price,
 		ReceiptsAmount: order.Price,
-		Remarks:        "农行线上充值",
+		Remarks:        order.From + "|" + order.Orderid,
 	}
 	var token, _ = h.Token()
 	URL := (*h).Config.Url + "/OtherPlatformsRecharge?AuthkeyType=1&Authkey=" + (*h).Config.Appid + "|" + token
-	res := http.HttpPost(URL, requestBody, "application/json")
-
+	res, err := http.HttpPost(URL, requestBody, "application/json")
+	if nil != err {
+		fmt.Println("ioutil ReadAll err:", err)
+	}
 	var ReqMsg RechargeRes
-	err := json.Unmarshal(res, &ReqMsg)
+	err = json.Unmarshal(res, &ReqMsg)
 	if err != nil {
 		return fmt.Errorf("接口错误 非预期返回值")
 	}
@@ -242,16 +240,18 @@ func (h *Yhcv2) Buyget(order model.Payorder) error {
 		Amount:          order.Price,
 		SubsidiesAmount: 0,
 		GiftAmount:      0,
-		Remarks:         order.From,
+		Remarks:         order.From + "|" + order.Orderid,
 		AuthkeyType:     1,
 	}
 
 	var token, _ = h.Token()
 	URL := (*h).Config.Url + "/OtherPlatformsConsumption?AuthkeyType=1&Authkey=" + (*h).Config.Appid + "|" + token
-	res := http.HttpPost(URL, requestBody, "application/json")
-
+	res, err := http.HttpPost(URL, requestBody, "application/json")
+	if nil != err {
+		fmt.Println("ioutil ReadAll err:", err)
+	}
 	var ReqMsg RechargeRes
-	err := json.Unmarshal(res, &ReqMsg)
+	err = json.Unmarshal(res, &ReqMsg)
 	if err != nil {
 		return fmt.Errorf("接口错误 非预期返回值")
 	}
@@ -274,8 +274,12 @@ func (h *Yhcv2) Token() (string, error) { //获取Token
 	}
 
 	var token = &(*h).TokenInfo
-	body := http.HttpGet((*h).Config.Url + "/GetToken?Appid=" + (*h).Config.Appid + "&Secretkey=" + (*h).Config.Secret)
-	err := json.Unmarshal([]byte(body), &token)
+	body, err := http.HttpGet((*h).Config.Url + "/GetToken?Appid=" + (*h).Config.Appid + "&Secretkey=" + (*h).Config.Secret)
+	if nil != err {
+		fmt.Println("Http get request err:", err)
+	}
+
+	err = json.Unmarshal([]byte(body), &token)
 	if err != nil {
 		return "", err
 	}

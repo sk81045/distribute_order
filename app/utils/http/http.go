@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func HttpGet(url string) string {
+func HttpGet(url string) (string, error) {
 	// 超时时间：5秒
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Get(url)
@@ -23,13 +23,11 @@ func HttpGet(url string) string {
 		n, err := resp.Body.Read(buffer[0:])
 		result.Write(buffer[0:n])
 		if err != nil && err == io.EOF {
-			break
-		} else if err != nil {
-			panic(err)
+			return "", err
 		}
 	}
 
-	return result.String()
+	return result.String(), nil
 }
 
 // 发送POST请求
@@ -37,7 +35,7 @@ func HttpGet(url string) string {
 // data：        POST请求提交的数据
 // contentType： 请求体格式，如：application/json
 // content：     请求放回的内容
-func HttpPost(url string, data interface{}, contentType string) []byte {
+func HttpPost(url string, data interface{}, contentType string) ([]byte, error) {
 
 	// 超时时间：5秒
 	client := &http.Client{Timeout: 5 * time.Second}
@@ -49,6 +47,6 @@ func HttpPost(url string, data interface{}, contentType string) []byte {
 	}
 	defer resp.Body.Close()
 
-	result, _ := ioutil.ReadAll(resp.Body)
-	return result
+	result, err := ioutil.ReadAll(resp.Body)
+	return result, err
 }

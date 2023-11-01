@@ -35,11 +35,11 @@ func (n Record) CheckParams(context *gin.Context) {
 		// 验证完成，调用控制器,并将验证器成员(字段)递给控制器，保持上下文数据一致性
 		switch variable.ConfigYml.GetString("Order.SellVersion") {
 		case "smv1":
-			(&dealings.Smv1{}).List(extraAddBindDataContext)
+			(&dealings.Smv1{}).RecordList(extraAddBindDataContext)
 		case "yhcv1":
 
 		case "yhcv2":
-			(&dealings.Yhcv2{}).List(extraAddBindDataContext)
+			(&dealings.Yhcv2{}).RecordList(extraAddBindDataContext)
 		}
 
 	}

@@ -6,7 +6,7 @@ import (
 	"goskeleton/app/global/consts"
 	"goskeleton/app/global/variable"
 	"goskeleton/app/model"
-	"goskeleton/app/model/smv1"
+	"goskeleton/app/model/yhcv1"
 	"goskeleton/app/utils/redis_factory"
 	"goskeleton/app/utils/response"
 	"goskeleton/app/utils/sign"
@@ -14,78 +14,62 @@ import (
 	"time"
 )
 
-type Smv1 struct {
+type Yhcv1 struct {
 }
 
 // 消费记录
-func (u *Smv1) RecordList(context *gin.Context) {
+func (y *Yhcv1) RecordList(context *gin.Context) {
 
 	type Params struct { //类型绑定
-		Pid   string `form:"pid"`
+		Pid   int64  `form:"pid"`
 		Stime string `form:"stime"`
 		Etime string `form:"etime"`
 	}
 	var p Params
 	if context.ShouldBindQuery(&p) != nil { //ShouldBindQuery 函数只绑定Get参数
-		fmt.Printf("====== 查询参数错误 pid:%s stime:%s etime:%s=====\n", p.Pid, p.Stime, p.Etime)
+		fmt.Printf("====== yhc查询参数错误 pid:%s stime:%s etime:%s=====\n", p.Pid, p.Stime, p.Etime)
 	}
 
-	chargeList := smv1.MChargeRecordsFactory("").List(p.Pid, p.Stime, p.Etime)
-	mealList := smv1.MealRecordsFactory("").List(p.Pid, p.Stime, p.Etime)
+	fmt.Printf("====== yhc查询参数 pid:%d stime:%s etime:%s=====\n", p.Pid, p.Stime, p.Etime)
 
-	temp1 := make([]model.DealRecord, len(chargeList))
-	for k, value := range chargeList {
-		// fmt.Println("temp1 value", value)
-		temp1[k].ID = value.Id
-		temp1[k].User = fmt.Sprintf("%d", value.Empid)
-		temp1[k].Orderid = value.Cardid
+	user, err := yhcv1.MermberFactory("").GetMemberInfo(p.Pid)
+	if err != nil {
+		response.Fail(context, consts.CurdSelectFailCode, consts.CurdSelectFailMsg, err.Error())
+		return
+	}
+
+	list := yhcv1.RecordInfoFactory("").List(user.UserNO, p.Stime, p.Etime)
+	temp1 := make([]model.DealRecord, len(list))
+	for k, value := range list {
+		temp1[k].ID = value.ID
+		temp1[k].User = value.UserNO
+		temp1[k].Ic = value.Ic
+		temp1[k].Orderid = value.Orderid
 		temp1[k].Macid = value.Clockid
-		temp1[k].Counterparty = value.DinRoom_name
-		temp1[k].Kind = value.Clock_name
-		temp1[k].Cooperation = value.OpUser
-		temp1[k].Operate = "1"
+		temp1[k].Counterparty = value.Terminal
+		temp1[k].Kind = value.Terminaltype
+		temp1[k].Cooperation = value.Cooperation
+		temp1[k].Operate = value.Cooperate //减款
 		temp1[k].Money = value.Money
 		temp1[k].Balance = value.Balance
-		temp1[k].Createdat = value.GetTime
+		temp1[k].Createdat = value.Createdat
 		temp1[k].Dealtime = value.Opdate
+		temp1[k].Remark = value.Remark
 	}
 
-	temp2 := make([]model.DealRecord, len(mealList))
-	for k, value := range mealList {
-		temp2[k].ID = value.Id
-		temp2[k].User = fmt.Sprintf("%d", value.Empid)
-		temp2[k].Orderid = value.Cardid
-		temp2[k].Macid = value.Clockid
-		temp2[k].Counterparty = value.DinRoom_name
-		temp2[k].Kind = value.Clock_name
-		temp2[k].Cooperation = value.OpUser
-		temp2[k].Operate = "-1"
-		temp2[k].Money = value.Money
-		temp2[k].Balance = value.Balance
-		temp2[k].Createdat = value.GetTime
-		temp2[k].Dealtime = value.Opdate
-	}
-
-	newlist := append(temp1, temp2...)
-	fmt.Printf("====== 查询参数 pid:%s stime:%s etime:%s 获取%d条数据===\n", p.Pid, p.Stime, p.Etime, len(newlist))
-
-	if newlist != nil {
+	if list != nil {
 		response.Success(context, consts.CurdStatusOkMsg, gin.H{
-			"list":         newlist,
-			"count":        len(newlist),
-			"chrage_count": len(chargeList),
-			"meal_count":   len(mealList),
+			"list": temp1,
 		})
 	} else {
-		fmt.Println("Fail")
 		response.Fail(context, consts.CurdSelectFailCode, consts.CurdSelectFailMsg, "")
 	}
 }
 
-// 消费记录
-func (u *Smv1) UserInfo(context *gin.Context) {
+// 获取用户
+func (u *Yhcv1) UserInfo(context *gin.Context) {
 	type Params struct { //类型绑定
-		Pid string `form:"pid" json:"pid"  binding:"required"`
+		Pid int64 `form:"pid" json:"pid"  binding:"required"`
 	}
 	var p *Params
 
@@ -95,21 +79,19 @@ func (u *Smv1) UserInfo(context *gin.Context) {
 		return
 	}
 
-	info, err := smv1.EmployeeFactory("").Employee(p.Pid)
+	info, err := yhcv1.MermberFactory("").GetMemberInfo(p.Pid)
+	fmt.Printf("====== 获取用户KEY:%d =====\n", p.Pid)
 	if err == nil {
-		if info.Status == "false" && info.Flag == "0" {
+		//会员状态  //1.正常 2.挂失 3.注销
+		switch info.CardState {
+		case "1":
 			info.CardState = "正常"
-		} else {
-			if info.Status == "true" {
-				info.CardState = "挂失"
-			}
-			if info.Flag == "1" {
-				info.CardState = "退卡"
-			} else if info.Flag == "2" {
-				info.CardState = "已补办"
-			} else {
-				info.CardState = "异常"
-			}
+		case "2":
+			info.CardState = "挂失"
+		case "3":
+			info.CardState = "注销"
+		default:
+			info.CardState = "未知"
 		}
 		response.Success(context, consts.CurdStatusOkMsg, info)
 	} else {
@@ -117,9 +99,30 @@ func (u *Smv1) UserInfo(context *gin.Context) {
 	}
 }
 
-// 消费记录
-func (y *Smv1) SetList(context *gin.Context) {
+// 用户列表
+func (y *Yhcv1) MemberList(context *gin.Context) {
+	type Params struct { //类型绑定
+		Page  int `form:"page" json:"page"  binding:"required"`
+		Limit int `form:"limit" json:"limit"  binding:"required"`
+	}
+	var p *Params
 
+	if context.ShouldBindQuery(&p) != nil { //ShouldBindQuery 函数只绑定Get参数
+		fmt.Printf("====== 获取用户 参数错误pid:%s =====\n", p.Limit)
+		response.Fail(context, consts.CurdSelectFailCode, "参数错误 Limit required!", "")
+		return
+	}
+
+	list, err := yhcv1.MermberFactory("").GetMembers(p.Page, p.Limit)
+
+	if err == nil {
+		response.Success(context, consts.CurdStatusOkMsg, list)
+	} else {
+		response.Fail(context, consts.CurdSelectFailCode, consts.CurdSelectFailMsg, "")
+	}
+}
+
+func (y *Yhcv1) SetList(context *gin.Context) {
 	type Params struct { //类型绑定
 		Sid   string `form:"sid"`
 		Pid   string `form:"pid"`
@@ -132,7 +135,16 @@ func (y *Smv1) SetList(context *gin.Context) {
 		fmt.Println("====== 添加订单 ======")
 	}
 
-	y.redisList(p.Sid, p.Num, p.Pid, " ")
+	// y.redisList(p.Sid, p.Num, p.Pid)
+	// return
+
+	list, _ := yhcv1.MermberFactory("").GetMembers(1, 5)
+
+	for _, v := range list {
+		fmt.Println("list", v.UserNO)
+		y.redisList(p.Sid, p.Num, fmt.Sprintf("%d", v.UserNO), v.Cardid)
+	}
+
 	// 这里随便模拟一条数据返回
 	response.Success(context, "ok", gin.H{
 		"PeopleInfo": p.Pid,
@@ -141,7 +153,7 @@ func (y *Smv1) SetList(context *gin.Context) {
 }
 
 // 测试 redis 连接池
-func (y *Smv1) redisList(list_key string, num int, pid string, ic string) {
+func (y *Yhcv1) redisList(list_key string, num int, pid string, ic string) {
 	redisClient := redis_factory.GetOneRedisClient()
 	for i := 1; i <= num; i++ {
 		rand.Seed(time.Now().UnixNano())

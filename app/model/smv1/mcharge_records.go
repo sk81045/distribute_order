@@ -76,11 +76,10 @@ ORDER BY MChargeRecords.ID DESC`
 	return nil
 }
 
-func (rs *MChargeRecords) Add(payorder model.Payorder) (ok bool) { //充值
+func (rs *MChargeRecords) Add(payorder model.Payorder) error { //充值
 	employee, err := EmployeeFactory("").Fetch(payorder.Studentid)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 	dealtime := time.Unix(payorder.Dealtime, 0)
 	createtime := time.Unix(payorder.Created_at, 0)
@@ -102,10 +101,9 @@ func (rs *MChargeRecords) Add(payorder model.Payorder) (ok bool) { //充值
 
 	result := rs.Omit("operate_type", "ID", "updated_at", "created_at", "Clock_name", "din_room_name").Create(&chargeData)
 	if result.Error != nil {
-		fmt.Println("处理交易失败")
-		return false
+		return fmt.Errorf("处理交易失败")
 	} else {
 		EmployeeFactory("").UpdateEmployee(employee.UserNO, blance, employee.CardSequ+1) //更新人事表
-		return true
+		return nil
 	}
 }

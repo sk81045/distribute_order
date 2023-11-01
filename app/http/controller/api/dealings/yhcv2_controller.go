@@ -18,7 +18,7 @@ type Yhcv2 struct {
 }
 
 // 消费记录
-func (y *Yhcv2) List(context *gin.Context) {
+func (y *Yhcv2) RecordList(context *gin.Context) {
 
 	type Params struct { //类型绑定
 		Pid   string `form:"pid"`
@@ -180,6 +180,33 @@ func (u *Yhcv2) UserInfo(context *gin.Context) {
 }
 
 // 消费记录
+func (y *Yhcv2) MemberList(context *gin.Context) {
+	type Params struct { //类型绑定
+		Page  int `form:"page" json:"page"  binding:"required"`
+		Limit int `form:"limit" json:"limit"  binding:"required"`
+	}
+	var p *Params
+
+	if context.ShouldBindQuery(&p) != nil { //ShouldBindQuery 函数只绑定Get参数
+		fmt.Printf("====== 获取用户 参数错误pid:%s =====\n", p.Limit)
+		response.Fail(context, consts.CurdSelectFailCode, "参数错误 Limit required!", "")
+		return
+	}
+
+	list, err := yhcv2.MermberFactory("").GetMembers(p.Page, p.Limit)
+
+	for _, v := range list {
+		fmt.Println("list", v.UserNO)
+	}
+
+	if err == nil {
+		response.Success(context, consts.CurdStatusOkMsg, list)
+	} else {
+		response.Fail(context, consts.CurdSelectFailCode, consts.CurdSelectFailMsg, "")
+	}
+}
+
+// 消费记录
 func (y *Yhcv2) SetList(context *gin.Context) {
 	type Params struct { //类型绑定
 		Sid   string `form:"sid"`
@@ -193,7 +220,12 @@ func (y *Yhcv2) SetList(context *gin.Context) {
 		fmt.Println("====== 添加订单 ======")
 	}
 
-	y.redisList(p.Sid, p.Num, p.Pid)
+	list, _ := yhcv2.MermberFactory("").GetMembers(1, 5)
+
+	for _, v := range list {
+		fmt.Println("list", v.UserNO)
+		y.redisList(p.Sid, p.Num, fmt.Sprintf("%d", v.UserNO))
+	}
 
 	// 这里随便模拟一条数据返回
 	response.Success(context, "ok", gin.H{
@@ -227,6 +259,7 @@ func (y *Yhcv2) redisList(list_key string, num int, pid string) {
 
 		orderid := "JX" + n + r
 		id := fmt.Sprintf("%d", i)
+		// list, _ := yhcv2.MermberFactory("").GetMembers(1, p.Limit)
 
 		orlist := `{"id":` + id + `,"sid":44,"pid":6019,"lid":0,"student_id":` + pid + `,"ic":"","orderid":"` + orderid + `","price":` + m + `,"macid":"150","type":` + ty + `,"from":"农行支付","paystatus":true,"category":"3","sync":false,"created_at":` + t + `,"dealtime":` + dt + `}`
 
