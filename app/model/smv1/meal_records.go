@@ -39,15 +39,15 @@ func (MealRecords) TableName() string {
 
 // 查询
 func (m *MealRecords) List(empID string, Stime string, Etime string) (temp []MealRecords) {
-	sql := `SELECT top 50 *
-FROM MealRecordsReal JOIN Clocks
-ON MealRecordsReal.clock_id = Clocks.Clock_id
-JOIN DinRoom
-ON Clocks.DinRoom_id = DinRoom.DinRoom_id 
-WHERE MealRecordsReal.emp_id = ? 
-AND MealRecordsReal.sign_time 
-BETWEEN ? AND ?
-ORDER BY MealRecordsReal.ID DESC`
+	sql := `SELECT top 50 MealRecordsReal.*,DinRoom.DinRoom_name, Clocks.Clock_name
+		FROM MealRecordsReal JOIN Clocks
+		ON MealRecordsReal.clock_id = Clocks.Clock_id
+		JOIN DinRoom
+		ON Clocks.DinRoom_id = DinRoom.DinRoom_id 
+		WHERE MealRecordsReal.emp_id = ? 
+		AND MealRecordsReal.sign_time 
+		BETWEEN ? AND ?
+		ORDER BY MealRecordsReal.ID DESC`
 	if res := m.Raw(sql, empID, Stime, Etime).Find(&temp); res.RowsAffected > 0 {
 		return temp
 	}
@@ -62,7 +62,8 @@ func (rs *MealRecords) Add(payorder model.Payorder) error { //充值
 	dealtime := time.Unix(payorder.Dealtime, 0)
 	createtime := time.Unix(payorder.Created_at, 0)
 	var blance = employee.AfterPay - payorder.Price
-	result := rs.Omit("operate_type", "ID", "updated_at", "created_at", "Clock_name", "din_room_name").Create(&MealRecords{
+	fmt.Println("xxxxxx", dealtime.Format("2006-01-02 15:04:05"))
+	var mealData = MealRecords{
 		Clockid:        payorder.Macid,
 		Empid:          payorder.Studentid,
 		Opdate:         dealtime.Format("2006-01-02 15:04:05"),
@@ -76,7 +77,9 @@ func (rs *MealRecords) Add(payorder model.Payorder) error { //充值
 		Accountid:      employee.Accountid,
 		OpUser:         payorder.From,
 		SubsidyConsume: "0",
-	})
+	}
+
+	result := rs.Omit("operate_type", "ID", "updated_at", "created_at", "Clock_name", "din_room_name").Create(&mealData)
 	if result.Error != nil {
 
 		return fmt.Errorf("处理交易失败")

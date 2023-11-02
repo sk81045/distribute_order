@@ -39,6 +39,11 @@ func Fail(c *gin.Context, dataCode int, msg string, data interface{}) {
 	c.Abort()
 }
 
+// 意外情况的业务逻辑
+func Exception(c *gin.Context, dataCode int, msg string, data interface{}) {
+	ReturnJson(c, http.StatusOK, dataCode, msg, data)
+}
+
 // ErrorTokenBaseInfo token 基本的格式错误
 func ErrorTokenBaseInfo(c *gin.Context) {
 	ReturnJson(c, http.StatusBadRequest, http.StatusBadRequest, my_errors.ErrorsTokenBaseInfo, "")

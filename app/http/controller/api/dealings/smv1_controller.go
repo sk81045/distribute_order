@@ -52,7 +52,7 @@ func (u *Smv1) RecordList(context *gin.Context) {
 
 	temp2 := make([]model.DealRecord, len(mealList))
 	for k, value := range mealList {
-		temp2[k].ID = value.Id
+		// temp2[k].ID = value.Id
 		temp2[k].User = fmt.Sprintf("%d", value.Empid)
 		temp2[k].Orderid = value.Cardid
 		temp2[k].Macid = value.Clockid
@@ -73,8 +73,8 @@ func (u *Smv1) RecordList(context *gin.Context) {
 		response.Success(context, consts.CurdStatusOkMsg, gin.H{
 			"list":         newlist,
 			"count":        len(newlist),
-			"chrage_count": len(chargeList),
 			"meal_count":   len(mealList),
+			"chrage_count": len(chargeList),
 		})
 	} else {
 		fmt.Println("Fail")
@@ -113,7 +113,7 @@ func (u *Smv1) UserInfo(context *gin.Context) {
 		}
 		response.Success(context, consts.CurdStatusOkMsg, info)
 	} else {
-		response.Fail(context, consts.CurdSelectFailCode, consts.CurdSelectFailMsg, "")
+		response.Exception(context, consts.CurdSelectFailCode, err.Error(), info)
 	}
 }
 
@@ -181,5 +181,5 @@ func (y *Smv1) redisList(list_key string, num int, pid string, ic string) {
 			fmt.Println("err", err)
 		}
 	}
-	redisClient.ReleaseOneRedisClient()
+	// redisClient.ReleaseOneRedisClient()
 }

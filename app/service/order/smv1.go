@@ -85,8 +85,10 @@ func (h *Smv1) Run(list_key string, secret string, order_config interface{}) {
 
 				//！！！异常订单处理 在这里设置重发次数和时间间隔
 				time.Sleep(time.Duration(h.ResendTime) * time.Duration(h.Count[1]) * time.Millisecond)
+				fmt.Printf("第 %d 次尝试\n", h.Count[1])
 				if h.Count[1] == h.ResendNum {
-					fmt.Printf("重试次数超出限制机 %d 加入错误订单\n", h.Count[1])
+					fmt.Printf("\033[7;33;2m重试次数超出限制 %d 已终止\033[0m\n", h.Count[1])
+
 					h.BadOrderProcess(payorder, pay_error)
 					h.Count[1] = 0
 				}
@@ -94,10 +96,11 @@ func (h *Smv1) Run(list_key string, secret string, order_config interface{}) {
 			time.Sleep(10 * time.Millisecond)
 			fmt.Printf("操作成功 %d 条订单\n", h.Count[0])
 		default:
-			redisClient := redis_factory.GetOneRedisClient()
-			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 0))
+			// redisClient := redis_factory.GetOneRedisClient()
+			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 10))
 			if err != nil {
-				fmt.Println("err", err)
+				fmt.Println("读取新订单列表数据", err)
+				continue
 			}
 			h.Order = string(res)
 			h.Cope <- 1 //处理订单
@@ -116,7 +119,6 @@ func (h *Smv1) BadOrderProcess(bad_order model.Payorder, err_msg error) {
 }
 
 func (h *Smv1) FailOrderProcess() {
-	fmt.Println("等待完成")
 	redisClient := redis_factory.GetOneRedisClient()
 	for {
 		select {
@@ -124,21 +126,22 @@ func (h *Smv1) FailOrderProcess() {
 			fmt.Println("等待正常订单处理完成")
 			continue
 		default:
-			fmt.Println("同步处理异常订单.....")
-
-			res, err := redisClient.StringMap(redisClient.Execute("BRPOP", h.List_key+"OrderFail", 0)) //阻塞等待list
-
+			res, err := redisClient.StringMap(redisClient.Execute("BRPOP", h.List_key+"OrderFail", 10)) //阻塞等待list
 			if err != nil {
-				fmt.Println("处理异常订单失败:1", err)
+				fmt.Println("异常订单列表无数据", err)
+				continue
 			}
+			fmt.Println("尝试处理异常订单...")
 			_, err = redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, res[h.List_key+"OrderFail"]))
 			if err != nil {
-				fmt.Println("异常订单出栈失败:2", err)
+				fmt.Println("删除异常订单", err)
+				continue
 			}
 
 			_, err = redisClient.Int64(redisClient.Execute("RPUSH", h.List_key, res[h.List_key+"OrderFail"]))
 			if err != nil {
-				fmt.Println("处理异常订单失败:3", err)
+				fmt.Println("将异常订单重新加入列表", err)
+				continue
 			}
 		}
 	}
