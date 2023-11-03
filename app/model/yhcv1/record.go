@@ -18,8 +18,8 @@ type FlowRecord struct {
 	Createdat    string  `gorm:"column:CreateDate" json:"createdat"` //创建时间
 	Cooperate    string  `gorm:"column:addMode" json:"cooperate"`
 	CardSequ     int     `gorm:"column:card_sequ" json:"count"`
-	Money        float32 `gorm:"column:payMoney" json:"price"`
-	Balance      float32 `gorm:"column:afterPay" json:"balance"`
+	Money        float64 `gorm:"column:payMoney" json:"price"`
+	Balance      float64 `gorm:"column:afterPay" json:"balance"`
 	Orderid      string  `gorm:"column:PayListNO" json:"orderid"`
 	Remark       string  `gorm:"column:Remarks" json:"remark"`
 	Terminal     string  `gorm:"column:devGrpName" json:"macType"`

@@ -10,8 +10,8 @@ type DealRecord struct {
 	Cooperation  string  `json:"cooperation"`
 	Operate      string  `json:"operate"`
 	Orderid      string  `json:"orderid"`
-	Money        float32 `json:"money"`
-	Balance      float32 `json:"balance"`
+	Money        float64 `json:"money"`
+	Balance      float64 `json:"balance"`
 	Createdat    string  `json:"createdat"`
 	Dealtime     string  `json:"dealtime"`
 	Remark       string  `json:"remark"`

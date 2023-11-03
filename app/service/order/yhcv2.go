@@ -7,6 +7,7 @@ import (
 	"goskeleton/app/utils/http"
 	"goskeleton/app/utils/redis_factory"
 	"goskeleton/app/utils/sign"
+	"strconv"
 	"time"
 )
 
@@ -30,44 +31,50 @@ type Yhcv2 struct {
 	List_key    string
 	Secret      string
 	Cope        chan int
-	Cope2       chan int
 	OriginOrder []string
 	Order       string
 	Count       []int64
+	ResendNum   int64
+	ResendTime  int64
 	Config
 	TokenInfo
+	RedisClient *redis_factory.RedisClient
 }
 
-var (
-	RedisClient = redis_factory.GetOneRedisClient()
-)
-
-func (manager *Yhcv2) Run(list_key string, secret string, order interface{}) {
+func (manager *Yhcv2) Run(list_key string, secret string, order_config interface{}) {
 	/**********************************任务初始化*************************/
 	manager.List_key = list_key
 	manager.Secret = secret
-	manager.Config.Url = fmt.Sprintf("%s", order.(map[string]interface{})["sellapiurl"])
-	manager.Config.Appid = fmt.Sprintf("%s", order.(map[string]interface{})["sellappid"])
-	manager.Config.Secret = fmt.Sprintf("%s", order.(map[string]interface{})["sellsecret"])
+	manager.Config.Url = fmt.Sprintf("%s", order_config.(map[string]interface{})["sellapiurl"])
+	manager.Config.Appid = fmt.Sprintf("%s", order_config.(map[string]interface{})["sellappid"])
+	manager.Config.Secret = fmt.Sprintf("%s", order_config.(map[string]interface{})["sellsecret"])
 
-	manager.Cope = make(chan int, 3)  //任务执行信号
-	manager.Cope2 = make(chan int, 3) //任务执行信号
-	manager.Count = make([]int64, 3)  //任务计数器
+	resendnum, _ := strconv.ParseInt(fmt.Sprintf("%d", order_config.(map[string]interface{})["resendnum"]), 10, 64)
+	manager.ResendNum = resendnum
+	resentime, _ := strconv.ParseInt(fmt.Sprintf("%d", order_config.(map[string]interface{})["resendtime"]), 10, 64)
+	manager.ResendTime = resentime
+
+	manager.Cope = make(chan int, 3) //任务执行信号
+	manager.Count = make([]int64, 3) //任务计数器
+	manager.RedisClient = redis_factory.GetOneRedisClient()
 	/*******************************************************************/
+	redisClient := manager.RedisClient
 	go manager.FailOrderProcess()
 	for {
 		select {
 		case <-manager.Cope:
-			redisClient := redis_factory.GetOneRedisClient()
-
 			payorder := model.Payorder{}
 			if err := json.Unmarshal([]byte(manager.Order), &payorder); err != nil {
+				fmt.Println("序列化失败", err)
+				manager.BadOrderProcess(payorder, err)
+				time.Sleep(10 * time.Millisecond)
 				continue
 			}
 
-			if !sign.Verify(manager.Order, secret) {
-				manager.BadOrderProcess(payorder, fmt.Errorf("Sign验证失败!"))
-				time.Sleep(1000 * time.Millisecond)
+			if err := sign.Verify(manager.Order, secret); err != nil {
+				fmt.Println("Sign验证失败")
+				manager.BadOrderProcess(payorder, err)
+				time.Sleep(10 * time.Millisecond)
 				continue
 			}
 
@@ -117,12 +124,13 @@ func (manager *Yhcv2) Run(list_key string, secret string, order interface{}) {
 }
 
 func (h *Yhcv2) BadOrderProcess(bad_order model.Payorder, err_msg error) {
+	redisClient := h.RedisClient
 	bad_order.Error = err_msg.Error()
 	bad, _ := json.Marshal(bad_order)
-	RedisClient.Int64(RedisClient.Execute("LPUSH", h.List_key+"Bad", string(bad)))
-	RedisClient.Int64(RedisClient.Execute("LREM", h.List_key, 0, h.Order))
-	RedisClient.Int64(RedisClient.Execute("LREM", h.List_key+"OrderFail", 0, h.Order))
-	RedisClient.Int64(RedisClient.Execute("LREM", h.List_key+"Backups", 0, h.Order))
+	redisClient.Int64(redisClient.Execute("LPUSH", h.List_key+"Bad", string(bad)))
+	redisClient.Int64(redisClient.Execute("LREM", h.List_key, 0, h.Order))
+	redisClient.Int64(redisClient.Execute("LREM", h.List_key+"OrderFail", 0, h.Order))
+	redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, h.Order))
 }
 
 func (h *Yhcv2) FailOrderProcess() {
@@ -133,29 +141,28 @@ func (h *Yhcv2) FailOrderProcess() {
 			fmt.Println("等待订单")
 			continue
 		default:
-			fmt.Println("同步处理异常订单.....")
-
 			res, err := redisClient.StringMap(redisClient.Execute("BRPOP", h.List_key+"OrderFail", 0)) //阻塞等待list
-
 			if err != nil {
-				fmt.Println("处理异常订单失败:1", err)
+				fmt.Println("异常订单列表无数据", err)
+				continue
 			}
+			fmt.Println("尝试处理异常订单...")
 			_, err = redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, res[h.List_key+"OrderFail"]))
 			if err != nil {
-				fmt.Println("异常订单出栈失败:2", err)
+				fmt.Println("从备份里取出异常订单", err)
+				continue
 			}
-
 			_, err = redisClient.Int64(redisClient.Execute("RPUSH", h.List_key, res[h.List_key+"OrderFail"]))
 			if err != nil {
-				fmt.Println("处理异常订单失败:3", err)
+				fmt.Println("将异常订单重新加入列表", err)
+				continue
 			}
 		}
 	}
 }
 
 func (h *Yhcv2) failOrder(list_key string, order string) {
-	redisClient := redis_factory.GetOneRedisClient()
-	redisClient.Int64(redisClient.Execute("LPUSH", list_key+"OrderFail", order))
+	h.RedisClient.Int64(h.RedisClient.Execute("LPUSH", list_key+"OrderFail", order))
 }
 
 type OrderParams struct {
@@ -164,11 +171,11 @@ type OrderParams struct {
 	MemberNo        int     `json:"MemberNo"`
 	PayTime         string  `json:"payTime"`
 	ConsumptionTime string  `json:"ConsumptionTime"`
-	ReceiptsAmount  float32 `json:"receiptsAmount"`
+	ReceiptsAmount  float64 `json:"receiptsAmount"`
 	TerminalNo      string  `json:"TerminalNo"`
-	Amount          float32 `json:"Amount"`
-	SubsidiesAmount float32 `json:"SubsidiesAmount"`
-	GiftAmount      float32 `json:"GiftAmount"`
+	Amount          float64 `json:"Amount"`
+	SubsidiesAmount float64 `json:"SubsidiesAmount"`
+	GiftAmount      float64 `json:"GiftAmount"`
 	Times           int     `json:"Times"`
 	Remarks         string  `json:"Remarks"`
 	AuthkeyType     int     `json:"AuthkeyType"`
@@ -197,14 +204,15 @@ func (h *Yhcv2) Process(order model.Payorder) error {
 
 func (h *Yhcv2) Recharge(order model.Payorder) error {
 	dealtime := time.Unix(order.Dealtime, 0)
+	Amount, _ := strconv.ParseFloat(order.Price, 64)
 	requestBody := OrderParams{ //充值报文
 		MerchantID:     "admin",
 		MemberID:       "",
 		MemberNo:       order.Studentid,
 		PayTime:        dealtime.Format("20060102150405"),
 		PayType:        "2",
-		Amount:         order.Price,
-		ReceiptsAmount: order.Price,
+		Amount:         Amount,
+		ReceiptsAmount: Amount,
 		Remarks:        order.From + "|" + order.Orderid,
 	}
 	var token, _ = h.Token()
@@ -231,13 +239,14 @@ func (h *Yhcv2) Recharge(order model.Payorder) error {
 
 func (h *Yhcv2) Buyget(order model.Payorder) error {
 	dealtime := time.Unix(order.Dealtime, 0)
+	Amount, _ := strconv.ParseFloat(order.Price, 64)
 	requestBody := OrderParams{
 		MerchantID:      "admin",
 		MemberID:        "",
 		MemberNo:        order.Studentid,
 		ConsumptionTime: dealtime.Format("20060102150405"),
 		TerminalNo:      order.Macid,
-		Amount:          order.Price,
+		Amount:          Amount,
 		SubsidiesAmount: 0,
 		GiftAmount:      0,
 		Remarks:         order.From + "|" + order.Orderid,

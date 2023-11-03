@@ -29,7 +29,7 @@ func Create(order string, secret string) string {
 	return sign
 }
 
-func Verify(order string, secret string) bool {
+func Verify(order string, secret string) error {
 	var orderMap map[string]interface{}
 	_ = json.Unmarshal([]byte(order), &orderMap)
 	//ksort
@@ -39,8 +39,6 @@ func Verify(order string, secret string) bool {
 		fmt.Println("sign 超时")
 		// return false
 	}
-
-	// orderMap["secret"] = secret
 	originsign := orderMap["sign"]
 	delete(orderMap, "sign")
 	var keys []string
@@ -57,11 +55,9 @@ func Verify(order string, secret string) bool {
 	ff := http_build_query[0 : len(http_build_query)-1]
 	sign := MD5(ff + secret)
 	if sign != originsign {
-		fmt.Println("sign验证失败:", sign, originsign)
-		return false
+		return fmt.Errorf("sign验证失败:" + "sign:" + sign + "|origin:" + ff + secret)
 	}
-	fmt.Println("sign成功验证:", sign)
-	return true
+	return nil
 }
 
 func MD5(str string) string {
@@ -74,8 +70,7 @@ func MD5(str string) string {
 func judgeTypeToString(v interface{}) string {
 	switch i := v.(type) {
 	case int:
-		r := fmt.Sprintf("%d", v)
-		return r
+		return fmt.Sprintf("%d", v)
 	case int64:
 		return fmt.Sprintf("%v", v)
 	case int32:
@@ -83,9 +78,9 @@ func judgeTypeToString(v interface{}) string {
 	case string:
 		return fmt.Sprintf("%s", v)
 	case float32:
-		return fmt.Sprintf("%f", v)
+		return fmt.Sprintf("%.0f", v)
 	case float64:
-		return fmt.Sprintf("%f", v)
+		return fmt.Sprintf("%.0f", v)
 	case bool:
 		return fmt.Sprintf("%v", v)
 	default:

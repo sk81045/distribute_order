@@ -40,19 +40,19 @@ func (h *Smv1) Run(list_key string, secret string, order_config interface{}) {
 		case <-h.Cope:
 			payorder := model.Payorder{}
 			if err := json.Unmarshal([]byte(h.Order), &payorder); err != nil {
+				fmt.Println("序列化失败", err)
+				h.BadOrderProcess(payorder, err)
+				time.Sleep(100 * time.Millisecond)
 				continue
 			}
 
-			if !sign.Verify(h.Order, secret) {
-				h.BadOrderProcess(payorder, fmt.Errorf("Sign验证失败!"))
-				time.Sleep(1000 * time.Millisecond)
+			if err := sign.Verify(h.Order, secret); err != nil {
+				fmt.Println("Sign验证失败")
+				h.BadOrderProcess(payorder, err)
+				time.Sleep(100 * time.Millisecond)
 				continue
 			}
 			order := h.Order
-			if err := json.Unmarshal([]byte(order), &payorder); err != nil {
-				fmt.Println("订单序列化失败:", err)
-				continue
-			}
 
 			var pay_error error
 			switch payorder.Type {
@@ -73,13 +73,14 @@ func (h *Smv1) Run(list_key string, secret string, order_config interface{}) {
 					continue
 				}
 
-				fmt.Printf("\033[7;32;2m交易成功|操作%d|$%f|订单号:%s|用户编号:%d|交易时间:%s\033[0m\n", payorder.Type, payorder.Price, payorder.Orderid, payorder.Studentid, paytime.Format("2006-01-02 15:04:05"))
+				fmt.Printf("\033[7;32;2m交易成功|操作%d|$%s|订单号:%s|用户编号:%d|交易时间:%s\033[0m\n", payorder.Type, payorder.Price, payorder.Orderid, payorder.Studentid, paytime.Format("2006-01-02 15:04:05"))
 				fmt.Println("====================================================")
 
 				h.Count[0]++
 			} else { //交易失败
-				h.RedisClient.Int64(h.RedisClient.Execute("LPUSH", list_key+"OrderFail", order))
-				fmt.Printf("\033[7;31;2m交易失败!|操作%d|$%f|订单号:%s|用户编号:%d|交易时间:%s\033[0m\n", payorder.Type, payorder.Price, payorder.Orderid, payorder.Studentid, paytime.Format("2006-01-02 15:04:05"))
+				h.RedisClient.Int64(h.RedisClient.Execute("LPUSH", list_key+"OrderFail", order)) //加入异常列表
+
+				fmt.Printf("\033[7;31;2m交易失败!|操作%d|$%s|订单号:%s|用户编号:%d|交易时间:%s\033[0m\n", payorder.Type, payorder.Price, payorder.Orderid, payorder.Studentid, paytime.Format("2006-01-02 15:04:05"))
 				fmt.Println("====================================================")
 				h.Count[1]++
 
@@ -96,7 +97,6 @@ func (h *Smv1) Run(list_key string, secret string, order_config interface{}) {
 			time.Sleep(10 * time.Millisecond)
 			fmt.Printf("操作成功 %d 条订单\n", h.Count[0])
 		default:
-			// redisClient := redis_factory.GetOneRedisClient()
 			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 10))
 			if err != nil {
 				fmt.Println("读取新订单列表数据", err)

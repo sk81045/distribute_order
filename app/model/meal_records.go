@@ -26,8 +26,8 @@ type MealRecords struct {
 	Empid       string  `gorm:"column:emp_id"`
 	Opdate      string  `gorm:"column:sign_time"`
 	CardSequ    int     `gorm:"column:card_sequ"`
-	ChargeMoney float32 `gorm:"column:card_consume"`
-	CardBalance float32 `gorm:"column:card_balance"`
+	ChargeMoney float64 `gorm:"column:card_consume"`
+	CardBalance float64 `gorm:"column:card_balance"`
 	ChargeKind  string  `gorm:"column:kind"`
 	Cardid      string  `gorm:"column:card_id"`
 	Accountid   string  `gorm:"column:account_id"`

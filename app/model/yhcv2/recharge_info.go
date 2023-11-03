@@ -19,8 +19,8 @@ type RechargeInfo struct {
 	Createdat    string  `gorm:"column:CreateDate" json:"createdat"`  //创建时间
 	OpUser       string  `gorm:"column:op_user" json:"cooperate"`
 	CardSequ     int     `gorm:"column:card_sequ" json:"count"`
-	Money        float32 `gorm:"column:Amount" json:"price"`
-	Balance      float32 `gorm:"column:Balance" json:"balance"`
+	Money        float64 `gorm:"column:Amount" json:"price"`
+	Balance      float64 `gorm:"column:Balance" json:"balance"`
 	BusinessType string  `gorm:"column:BusinessType"`
 	Orderid      string  `gorm:"column:SerialNo" json:"orderid"`
 	Remark       string  `gorm:"column:Remarks" json:"remark"`

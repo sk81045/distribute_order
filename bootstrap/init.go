@@ -41,9 +41,9 @@ func checkRequiredFolders() {
 			log.Fatal(my_errors.ErrorsSoftLinkDeleteFail + err.Error())
 		}
 	}
-	if err := os.Symlink(variable.BasePath+"/storage/app", variable.BasePath+"/public/storage"); err != nil {
-		log.Fatal(my_errors.ErrorsSoftLinkCreateFail + err.Error())
-	}
+	// if err := os.Symlink(variable.BasePath+"/storage/app", variable.BasePath+"/public/storage"); err != nil {
+	// 	log.Fatal(my_errors.ErrorsSoftLinkCreateFail + err.Error())
+	// }
 }
 
 func init() {
@@ -122,9 +122,15 @@ func init() {
 		case "smv1":
 			go (&order.Smv1{}).Run(
 				variable.ConfigYml.GetString("App.Sid"),
-				variable.ConfigYml.GetString("App.Secret"))
+				variable.ConfigYml.GetString("App.Secret"),
+				variable.ConfigYml.Get("Order"))
 		case "yhcv1":
+			log.Println("yhcv1类型!")
 
+			go (&order.Yhcv1{}).Run(
+				variable.ConfigYml.GetString("App.Sid"),
+				variable.ConfigYml.GetString("App.Secret"),
+				variable.ConfigYml.Get("Order"))
 		case "yhcv2":
 			log.Println("yhcv2类型!")
 

@@ -16,8 +16,8 @@ type Employee struct {
 	UserNO    int     `gorm:"column:emp_id" json:"user_no"`
 	Cardid    string  `gorm:"column:card_sn" json:"ic"`
 	CardSequ  int     `gorm:"column:card_sequ"`
-	AfterPay  float32 `gorm:"column:card_balance" json:"balance"`
-	PayCount  float32 `gorm:"column:subsidy_balance"`
+	AfterPay  float64 `gorm:"column:card_balance" json:"balance"`
+	PayCount  float64 `gorm:"column:subsidy_balance"`
 	CardState string  `gorm:"column:isleaved" json:"card_state"`
 	Accountid string  `gorm:"column:account_id"`
 	Isleaved  string  `gorm:"column:isleaved"`
@@ -58,7 +58,7 @@ func (e *Employee) Employee(key string) (*Employee, error) {
 	}
 }
 
-func (rs *Employee) UpdateEmployee(empID int, blance float32, sq int) {
+func (rs *Employee) UpdateEmployee(empID int, blance float64, sq int) {
 	result := rs.Model(&rs).Where("emp_id = ?", empID).Updates(&Employee{
 		AfterPay: blance,
 		CardSequ: sq,

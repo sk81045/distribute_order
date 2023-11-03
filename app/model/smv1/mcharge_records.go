@@ -1,9 +1,9 @@
 package smv1
 
 import (
-	// "encoding/json"
 	"fmt"
 	"goskeleton/app/model"
+	"strconv"
 	"time"
 )
 
@@ -35,8 +35,8 @@ type MChargeRecords struct {
 	GetTime        string  `gorm:"column:get_time" json:"createdat"` //创建时间
 	OpUser         string  `gorm:"column:op_user" json:"cooperate"`
 	CardSequ       int     `gorm:"column:card_sequ" json:"count"`
-	Money          float32 `gorm:"column:charge_money" json:"price"`
-	Balance        float32 `gorm:"column:card_balance" json:"balance"`
+	Money          float64 `gorm:"column:charge_money" json:"price"`
+	Balance        float64 `gorm:"column:card_balance" json:"balance"`
 	Kind           string  `gorm:"column:Kind" json:"kind"`
 	ChargeKind     string  `gorm:"column:charge_Kind" json:"Chargekind"`
 	Cardid         string  `gorm:"column:card_id" json:"orderid"`
@@ -83,14 +83,15 @@ func (rs *MChargeRecords) Add(payorder model.Payorder) error { //充值
 	}
 	dealtime := time.Unix(payorder.Dealtime, 0)
 	createtime := time.Unix(payorder.Created_at, 0)
-	var blance = employee.AfterPay + payorder.Price
+	var money, _ = strconv.ParseFloat(payorder.Price, 64)
+	var blance = employee.AfterPay + money
 	var chargeData = MChargeRecords{
 		Clockid:   payorder.Macid,
 		Empid:     payorder.Studentid,
 		Opdate:    dealtime.Format("2006-01-02 15:04:05"),
 		GetTime:   createtime.Format("2006-01-02 15:04:05"),
 		CardSequ:  employee.CardSequ + 1,
-		Money:     payorder.Price,
+		Money:     money,
 		Balance:   blance,
 		Kind:      "6",
 		Cardid:    payorder.Orderid,

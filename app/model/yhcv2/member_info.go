@@ -15,7 +15,7 @@ type MemberInfo struct {
 	Name       string  `gorm:"column:MemberName" json:"name"`
 	UserNO     int     `gorm:"column:MemberNo" json:"user_no"`
 	Cardid     string  `gorm:"column:MemberCardNo" json:"ic"`
-	AfterPay   float32 `gorm:"column:Balance" json:"balance"`
+	AfterPay   float64 `gorm:"column:Balance" json:"balance"`
 	MerchantID string  `gorm:"column:MerchantID"`
 	CardState  string  `gorm:"column:MemberState" json:"card_state"`
 	CardType
