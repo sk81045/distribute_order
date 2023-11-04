@@ -21,8 +21,10 @@ type Payorder struct {
 	Sync       int    `gorm:"column:sync" json:"sync"`
 	Created_at int64  `gorm:"column:created_at" json:"created_at"`
 	Dealtime   int64  `gorm:"column:deal_time" json:"dealtime"`
+	Sign       string `gorm:"column:sign" json:"sign"`
 	Mark       string `gorm:"column:mark" json:"mark"`
 	Error      string `gorm:"column:error" json:"error"`
+	Resend     int64  `gorm:"column:resend" json:"resend"`
 }
 
 func (Payorder) TableName() string {

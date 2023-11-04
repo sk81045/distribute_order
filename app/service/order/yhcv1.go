@@ -96,7 +96,7 @@ func (manager *Yhcv1) Run(list_key string, secret string, order_config interface
 
 			}
 
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(time.Duration(manager.ResendTime) * time.Millisecond)
 			fmt.Printf("操作成功 %d 条订单\n", manager.Count[0])
 		default:
 			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 0))

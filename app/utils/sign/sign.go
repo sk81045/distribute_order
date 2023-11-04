@@ -55,7 +55,7 @@ func Verify(order string, secret string) error {
 	ff := http_build_query[0 : len(http_build_query)-1]
 	sign := MD5(ff + secret)
 	if sign != originsign {
-		return fmt.Errorf("sign验证失败:" + "sign:" + sign + "|origin:" + ff + secret)
+		return fmt.Errorf("sign验证失败" + sign)
 	}
 	return nil
 }

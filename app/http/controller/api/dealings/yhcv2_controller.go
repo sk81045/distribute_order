@@ -261,11 +261,11 @@ func (y *Yhcv2) redisList(list_key string, num int, pid string) {
 		id := fmt.Sprintf("%d", i)
 		// list, _ := yhcv2.MermberFactory("").GetMembers(1, p.Limit)
 
-		orlist := `{"id":` + id + `,"sid":44,"pid":6019,"lid":0,"student_id":` + pid + `,"ic":"","orderid":"` + orderid + `","price":` + m + `,"macid":"150","type":` + ty + `,"from":"农行支付","paystatus":true,"category":"3","sync":false,"created_at":` + t + `,"dealtime":` + dt + `}`
+		orlist := `{"id":` + id + `,"sid":44,"pid":6019,"lid":0,"student_id":` + pid + `,"ic":"","orderid":"` + orderid + `","price":"` + m + `.1","macid":"150","type":` + ty + `,"from":"农行支付","paystatus":2,"category":"3","sync":2,"created_at":` + t + `,"dealtime":` + dt + `}`
 
 		sign := sign.Create(orlist, variable.ConfigYml.GetString("App.Secret"))
 		// fmt.Println("orlist", orlist)
-		list := `{"id":` + id + `,"sid":44,"pid":6019,"lid":0,"student_id":` + pid + `,"ic":"","orderid":"` + orderid + `","price":` + m + `,"macid":"150","type":` + ty + `,"from":"农行支付","paystatus":true,"category":"3","sync":false,"created_at":` + t + `,"dealtime":` + dt + `,"sign":"` + sign + `"}`
+		list := `{"id":` + id + `,"sid":44,"pid":6019,"lid":0,"student_id":` + pid + `,"ic":"","orderid":"` + orderid + `","price":"` + m + `.1","macid":"150","type":` + ty + `,"from":"农行支付","paystatus":2,"category":"3","sync":2,"created_at":` + t + `,"dealtime":` + dt + `,"sign":"` + sign + `"}`
 
 		_, err := redisClient.Int64(redisClient.Execute("LPUSH", list_key, list))
 		if err != nil {

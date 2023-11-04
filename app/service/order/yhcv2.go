@@ -28,14 +28,15 @@ type TokenInfo struct {
 }
 
 type Yhcv2 struct {
-	List_key    string
-	Secret      string
-	Cope        chan int
-	OriginOrder []string
-	Order       string
-	Count       []int64
-	ResendNum   int64
-	ResendTime  int64
+	List_key string
+	Secret   string
+	Cope     chan int
+	// FailCope   chan *model.Payorder
+	FailCope   chan string
+	Order      string
+	Count      []int64
+	ResendNum  int64
+	ResendTime int64
 	Config
 	TokenInfo
 	RedisClient *redis_factory.RedisClient
@@ -54,7 +55,10 @@ func (manager *Yhcv2) Run(list_key string, secret string, order_config interface
 	resentime, _ := strconv.ParseInt(fmt.Sprintf("%d", order_config.(map[string]interface{})["resendtime"]), 10, 64)
 	manager.ResendTime = resentime
 
-	manager.Cope = make(chan int, 3) //任务执行信号
+	manager.Cope = make(chan int, 1) //任务执行信号
+	// manager.FailCope = make(chan *model.Payorder, 1)
+	manager.FailCope = make(chan string, 1)
+
 	manager.Count = make([]int64, 3) //任务计数器
 	manager.RedisClient = redis_factory.GetOneRedisClient()
 	/*******************************************************************/
@@ -67,20 +71,22 @@ func (manager *Yhcv2) Run(list_key string, secret string, order_config interface
 			if err := json.Unmarshal([]byte(manager.Order), &payorder); err != nil {
 				fmt.Println("序列化失败", err)
 				manager.BadOrderProcess(payorder, err)
-				time.Sleep(10 * time.Millisecond)
 				continue
 			}
 
-			if err := sign.Verify(manager.Order, secret); err != nil {
-				fmt.Println("Sign验证失败")
-				manager.BadOrderProcess(payorder, err)
-				time.Sleep(10 * time.Millisecond)
-				continue
+			if payorder.Mark != "RESEND" { //重发被标记的订单不做sign验证
+				if err := sign.Verify(manager.Order, secret); err != nil {
+					fmt.Println("Sign验证失败")
+					manager.BadOrderProcess(payorder, err)
+					continue
+				}
+			} else {
+				fmt.Println("重发被标记的订单不做sign验证")
 			}
 
 			order := manager.Order
-			msg := "$"
 			pay_error := manager.Process(payorder)
+			paytime := time.Unix(payorder.Dealtime, 0)
 			//2. 充值
 			if pay_error == nil {
 				_, err := redisClient.Int64(redisClient.Execute("LPUSH", "OrderDone", order))
@@ -88,27 +94,44 @@ func (manager *Yhcv2) Run(list_key string, secret string, order_config interface
 					fmt.Println("无法将订单加入已完成列表:", order)
 					continue
 				}
-				time := time.Unix(payorder.Created_at, 0)
-				fmt.Printf("交易成功|%s%f|订单号:%s|用户编号:%d|日期:%s \n", msg, payorder.Price, payorder.Orderid, payorder.Studentid, time.Format("2006-01-02 15:04:05"))
+				fmt.Printf("\033[7;32;2m交易成功|操作%d|$%s|订单号:%s|用户编号:%d|交易时间:%s\033[0m\n", payorder.Type, payorder.Price, payorder.Orderid, payorder.Studentid, paytime.Format("2006-01-02 15:04:05"))
 				fmt.Println("======================end==============================")
 				manager.Count[0]++
 			} else {
 				//交易失败
-				manager.failOrder(list_key, order)
-				fmt.Println("=====================start=============================")
-				fmt.Printf("交易失败!|%s%f|订单号:%s|用户编号:%d \n", msg, payorder.Price, payorder.Orderid, payorder.Studentid)
-				fmt.Println("======================end==============================")
-				manager.Count[1]++
+				_, err := manager.RedisClient.Int64(manager.RedisClient.Execute("LPUSH", manager.List_key+"OrderFail", order))
+				if err != nil {
+					fmt.Println("PUSH IN FAILLIST:", err)
+					manager.BadOrderProcess(payorder, err)
+					continue
+				}
+
+				fmt.Printf("\033[7;31;2m交易失败!|操作%d|$%s|订单号:%s|用户编号:%d|交易时间:%s\033[0m\n", payorder.Type, payorder.Price, payorder.Orderid, payorder.Studentid, paytime.Format("2006-01-02 15:04:05"))
+				fmt.Println("====================================================")
+
+				fmt.Println("重发次数", payorder.Resend)
+
+				if payorder.Resend >= manager.ResendNum {
+					fmt.Printf("\033[7;33;2m重试次数超出限制 %d 已终止\033[0m\n", manager.Count[1])
+					manager.BadOrderProcess(payorder, pay_error)
+					continue
+				}
+				time.Sleep(time.Duration(payorder.Resend*100) * time.Millisecond)
+				manager.FailCope <- order
+				continue
 				//！！！异常订单处理 在这里设置重发次数和时间间隔
-				time.Sleep((1000 * time.Duration(manager.Count[1])) * time.Millisecond)
-				if manager.Count[1] == 10 {
-					fmt.Printf("重试次数超出限制机 %d 加入错误订单\n", manager.Count[1])
+				manager.Count[1]++
+				time.Sleep(time.Duration(manager.ResendTime) * time.Duration(manager.Count[1]) * time.Millisecond)
+				fmt.Printf("第 %d 次尝试\n", manager.Count[1])
+				if manager.Count[1] == manager.ResendNum {
+					fmt.Printf("\033[7;33;2m重试次数超出限制 %d 已终止\033[0m\n", manager.Count[1])
+
 					manager.BadOrderProcess(payorder, pay_error)
 					manager.Count[1] = 0
 				}
 			}
 
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(time.Duration(manager.ResendTime) * time.Millisecond)
 			fmt.Printf("操作成功 %d 条订单\n", manager.Count[0])
 
 		default:
@@ -124,45 +147,53 @@ func (manager *Yhcv2) Run(list_key string, secret string, order_config interface
 }
 
 func (h *Yhcv2) BadOrderProcess(bad_order model.Payorder, err_msg error) {
-	redisClient := h.RedisClient
+	// redisClient := h.RedisClient
+	redisClient := redis_factory.GetOneRedisClient()
 	bad_order.Error = err_msg.Error()
 	bad, _ := json.Marshal(bad_order)
 	redisClient.Int64(redisClient.Execute("LPUSH", h.List_key+"Bad", string(bad)))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key, 0, h.Order))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key+"OrderFail", 0, h.Order))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, h.Order))
+	// redisClient.ReleaseOneRedisClient()
 }
 
 func (h *Yhcv2) FailOrderProcess() {
-	redisClient := redis_factory.GetOneRedisClient()
+	redisClient := h.RedisClient
 	for {
 		select {
-		case <-h.Cope:
-			fmt.Println("等待订单")
-			continue
-		default:
-			res, err := redisClient.StringMap(redisClient.Execute("BRPOP", h.List_key+"OrderFail", 0)) //阻塞等待list
+		// x = <- ch
+		case fail_order := <-h.FailCope:
+			fmt.Println("尝试处理异常订单...", fail_order)
+
+			_, err := redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, fail_order))
 			if err != nil {
-				fmt.Println("异常订单列表无数据", err)
+				fmt.Println("从备份里删除异常订单", err)
 				continue
 			}
-			fmt.Println("尝试处理异常订单...")
-			_, err = redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, res[h.List_key+"OrderFail"]))
+
+			_, err = redisClient.Int64(redisClient.Execute("LREM", h.List_key+"OrderFail", 0, fail_order))
 			if err != nil {
-				fmt.Println("从备份里取出异常订单", err)
+				fmt.Println("删除异常订单", err)
 				continue
 			}
-			_, err = redisClient.Int64(redisClient.Execute("RPUSH", h.List_key, res[h.List_key+"OrderFail"]))
+			order := model.Payorder{}
+			if err := json.Unmarshal([]byte(fail_order), &order); err != nil {
+				fmt.Println("异常订单序列化失败", err)
+				h.BadOrderProcess(order, err)
+				continue
+			}
+
+			order.Resend = order.Resend + 1
+			order.Mark = "RESEND" //重发订单标记
+			new_fail_order_str, _ := json.Marshal(order)
+			_, err = redisClient.Int64(redisClient.Execute("RPUSH", h.List_key, new_fail_order_str))
 			if err != nil {
 				fmt.Println("将异常订单重新加入列表", err)
 				continue
 			}
 		}
 	}
-}
-
-func (h *Yhcv2) failOrder(list_key string, order string) {
-	h.RedisClient.Int64(h.RedisClient.Execute("LPUSH", list_key+"OrderFail", order))
 }
 
 type OrderParams struct {
@@ -215,7 +246,10 @@ func (h *Yhcv2) Recharge(order model.Payorder) error {
 		ReceiptsAmount: Amount,
 		Remarks:        order.From + "|" + order.Orderid,
 	}
-	var token, _ = h.Token()
+	var token, err = h.Token()
+	if err != nil {
+		return err
+	}
 	URL := (*h).Config.Url + "/OtherPlatformsRecharge?AuthkeyType=1&Authkey=" + (*h).Config.Appid + "|" + token
 	res, err := http.HttpPost(URL, requestBody, "application/json")
 	if nil != err {
@@ -228,10 +262,8 @@ func (h *Yhcv2) Recharge(order model.Payorder) error {
 	}
 
 	if ReqMsg.Success == true {
-		fmt.Printf("\033[32;4mid %d:%s-> +%f\033[0m\n", order.Studentid, ReqMsg.Message, order.Price)
 		return nil
 	} else {
-		fmt.Printf("\033[7;31;40mid %d:%s\033[0m\n", order.Studentid, ReqMsg.Message)
 		return fmt.Errorf(ReqMsg.Message)
 	}
 
@@ -253,7 +285,10 @@ func (h *Yhcv2) Buyget(order model.Payorder) error {
 		AuthkeyType:     1,
 	}
 
-	var token, _ = h.Token()
+	var token, err = h.Token()
+	if err != nil {
+		return err
+	}
 	URL := (*h).Config.Url + "/OtherPlatformsConsumption?AuthkeyType=1&Authkey=" + (*h).Config.Appid + "|" + token
 	res, err := http.HttpPost(URL, requestBody, "application/json")
 	if nil != err {
@@ -266,10 +301,8 @@ func (h *Yhcv2) Buyget(order model.Payorder) error {
 	}
 
 	if ReqMsg.Success == true {
-		fmt.Printf("\033[32;4mid %d:%s-> -%f\033[0m\n", order.Studentid, ReqMsg.Message, order.Price)
 		return nil
 	} else {
-		fmt.Printf("\033[7;31;40mid %d:%s\033[0m\n", order.Studentid, ReqMsg.Message)
 		return fmt.Errorf(ReqMsg.Message)
 	}
 
@@ -278,14 +311,15 @@ func (h *Yhcv2) Buyget(order model.Payorder) error {
 func (h *Yhcv2) Token() (string, error) { //获取Token
 	timeout, _ := time.ParseInLocation("2006-01-02 15:04:05", (*h).TokenInfo.ValidityDate, time.Local)
 	if time.Now().Unix() < timeout.Unix() {
-		fmt.Println("Token 未超时")
+		fmt.Println("Token", (*h).TokenInfo.Token)
 		return (*h).TokenInfo.Token, nil
 	}
 
 	var token = &(*h).TokenInfo
 	body, err := http.HttpGet((*h).Config.Url + "/GetToken?Appid=" + (*h).Config.Appid + "&Secretkey=" + (*h).Config.Secret)
+	// http.TestGet()
 	if nil != err {
-		fmt.Println("Http get request err:", err)
+		return "", fmt.Errorf("网络原因 获取token失败")
 	}
 
 	err = json.Unmarshal([]byte(body), &token)

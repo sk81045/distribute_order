@@ -94,7 +94,7 @@ func (h *Smv1) Run(list_key string, secret string, order_config interface{}) {
 					h.Count[1] = 0
 				}
 			}
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(time.Duration(h.ResendTime) * time.Millisecond)
 			fmt.Printf("操作成功 %d 条订单\n", h.Count[0])
 		default:
 			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 10))
