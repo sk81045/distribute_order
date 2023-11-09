@@ -18,6 +18,7 @@ import (
 type Yhcv1 struct {
 	List_key   string
 	Cope       chan int
+	FailCope   chan string
 	Order      string
 	ResendNum  int64
 	ResendTime int64
@@ -36,9 +37,9 @@ func (manager *Yhcv1) Run(list_key string, secret string, order_config interface
 	manager.ResendNum = resendnum
 	resentime, _ := strconv.ParseInt(fmt.Sprintf("%d", order_config.(map[string]interface{})["resendtime"]), 10, 64)
 	manager.ResendTime = resentime
-	manager.Cope = make(chan int, 3) //任务执行信号
-	manager.Count = make([]int64, 3) //任务计数器
-
+	manager.Cope = make(chan int, 3)        //任务执行信号
+	manager.Count = make([]int64, 3)        //任务计数器
+	manager.FailCope = make(chan string, 1) //异常订单执行信号
 	manager.RedisClient = redis_factory.GetOneRedisClient()
 	/*******************************************************************/
 
@@ -52,15 +53,17 @@ func (manager *Yhcv1) Run(list_key string, secret string, order_config interface
 			if err := json.Unmarshal([]byte(manager.Order), &payorder); err != nil {
 				fmt.Println("序列化失败", err)
 				manager.BadOrderProcess(payorder, err)
-				time.Sleep(10 * time.Millisecond)
 				continue
 			}
 
-			if err := sign.Verify(manager.Order, secret); err != nil {
-				fmt.Println("Sign验证失败")
-				manager.BadOrderProcess(payorder, err)
-				time.Sleep(10 * time.Millisecond)
-				continue
+			if payorder.Mark != "RESEND" { //重发被标记的订单不做sign验证
+				if err := sign.Verify(manager.Order, secret); err != nil {
+					fmt.Println("Sign验证失败")
+					manager.BadOrderProcess(payorder, err)
+					continue
+				}
+			} else {
+				fmt.Println("重发被标记的订单不做sign验证")
 			}
 
 			order := manager.Order
@@ -81,27 +84,25 @@ func (manager *Yhcv1) Run(list_key string, secret string, order_config interface
 			} else {
 				//交易失败
 				manager.failOrder(list_key, order)
+				//！！！异常订单处理 在这里设置重发次数和时间间隔
 				fmt.Printf("\033[7;31;2m交易失败!|操作%d|$%s|订单号:%s|用户编号:%d|交易时间:%s\033[0m\n", payorder.Type, payorder.Price, payorder.Orderid, payorder.Studentid, paytime.Format("2006-01-02 15:04:05"))
 				fmt.Println("====================================================")
-				manager.Count[1]++
-				//！！！异常订单处理 在这里设置重发次数和时间间隔
-				time.Sleep(time.Duration(manager.ResendTime) * time.Duration(manager.Count[1]) * time.Millisecond)
-				fmt.Printf("第 %d 次尝试\n", manager.Count[1])
-				if manager.Count[1] == manager.ResendNum {
-					fmt.Printf("\033[7;33;2m重试次数超出限制 %d 已终止\033[0m\n", manager.Count[1])
-
+				fmt.Println("重发次数", payorder.Resend)
+				if payorder.Resend >= manager.ResendNum {
+					fmt.Printf("\033[7;33;2m重试次数超出限制 %d 已终止\033[0m\n", manager.ResendNum)
 					manager.BadOrderProcess(payorder, pay_error)
-					manager.Count[1] = 0
+					continue
 				}
-
+				time.Sleep(time.Duration(payorder.Resend*100) * time.Millisecond)
+				manager.FailCope <- order
 			}
 
 			time.Sleep(time.Duration(manager.ResendTime) * time.Millisecond)
 			fmt.Printf("操作成功 %d 条订单\n", manager.Count[0])
 		default:
-			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 0))
+			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 30))
 			if err != nil {
-				fmt.Println("err", err)
+				fmt.Println("读取新订单列表数据", err)
 				continue
 			}
 			manager.Order = string(res)
@@ -122,29 +123,37 @@ func (h *Yhcv1) BadOrderProcess(bad_order model.Payorder, err_msg error) {
 }
 
 func (h *Yhcv1) FailOrderProcess() {
-	redisClient := redis_factory.GetOneRedisClient()
 	for {
 		select {
-		case <-h.Cope:
-			fmt.Println("等待正常订单处理完成")
-			continue
-		default:
-			res, err := redisClient.StringMap(redisClient.Execute("BRPOP", h.List_key+"OrderFail", 0)) //阻塞等待list
-			if err != nil {
-				fmt.Println("异常订单列表无数据", err)
-				continue
-			}
-			fmt.Println("尝试处理异常订单...")
-			_, err = redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, res[h.List_key+"OrderFail"]))
+		case fail_order := <-h.FailCope:
+			fmt.Println("尝试处理异常订单...", fail_order)
+			redisClient := redis_factory.GetOneRedisClient()
+			_, err := redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, fail_order))
 			if err != nil {
 				fmt.Println("从备份里取出异常订单", err)
 				continue
 			}
-			_, err = redisClient.Int64(redisClient.Execute("RPUSH", h.List_key, res[h.List_key+"OrderFail"]))
+			_, err = redisClient.Int64(redisClient.Execute("LREM", h.List_key+"OrderFail", 0, fail_order))
+			if err != nil {
+				fmt.Println("取出异常订单", err)
+				continue
+			}
+			order := model.Payorder{}
+			if err := json.Unmarshal([]byte(fail_order), &order); err != nil {
+				fmt.Println("异常订单序列化失败", err)
+				h.BadOrderProcess(order, err)
+				continue
+			}
+
+			order.Resend = order.Resend + 1
+			order.Mark = "RESEND" //重发订单标记
+			new_fail_order_str, _ := json.Marshal(order)
+			_, err = redisClient.Int64(redisClient.Execute("RPUSH", h.List_key, new_fail_order_str))
 			if err != nil {
 				fmt.Println("将异常订单重新加入列表", err)
 				continue
 			}
+			redisClient.ReleaseOneRedisClient()
 		}
 	}
 }
@@ -239,37 +248,4 @@ type Body struct {
 type completeResponse struct {
 	XMLName xml.Name `xml:"PayListAddResponse"`
 	MyVar   string   `xml:"return"`
-}
-
-func (h *Yhcv1) Buyget(order model.Payorder) error {
-
-	return nil
-
-}
-
-// BLPOP list1 100
-func (h *Yhcv1) BLPOP(list_key string) []string {
-	res, err := h.RedisClient.Strings(h.RedisClient.Execute("BLPOP", list_key, 3))
-	if err != nil {
-		fmt.Println("err", err)
-	}
-	return res
-}
-
-func (h *Yhcv1) LLEN(list_key string) int64 {
-	res, err := h.RedisClient.Int64(h.RedisClient.Execute("LLEN", list_key))
-	if err != nil {
-		fmt.Println("err", err)
-	}
-	return res
-}
-
-// LLEN KEY_NAME
-func (h *Yhcv1) Lrange(list_key string, START int64, END int64) []string {
-	res, err := h.RedisClient.Strings(h.RedisClient.Execute("LRANGE", list_key, START, END))
-	if err != nil {
-		fmt.Println("Lrange err", err)
-	}
-	h.RedisClient.ReleaseOneRedisClient()
-	return res
 }

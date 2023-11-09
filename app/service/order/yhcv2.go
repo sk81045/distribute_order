@@ -57,7 +57,7 @@ func (manager *Yhcv2) Run(list_key string, secret string, order_config interface
 
 	manager.Cope = make(chan int, 1) //任务执行信号
 	// manager.FailCope = make(chan *model.Payorder, 1)
-	manager.FailCope = make(chan string, 1)
+	manager.FailCope = make(chan string, 1) //异常订单执行信号
 
 	manager.Count = make([]int64, 3) //任务计数器
 	manager.RedisClient = redis_factory.GetOneRedisClient()
@@ -91,11 +91,11 @@ func (manager *Yhcv2) Run(list_key string, secret string, order_config interface
 			if pay_error == nil {
 				_, err := redisClient.Int64(redisClient.Execute("LPUSH", "OrderDone", order))
 				if err != nil {
-					fmt.Println("无法将订单加入已完成列表:", order)
+					fmt.Println("无法将订单加入已完成列表:", err)
 					continue
 				}
 				fmt.Printf("\033[7;32;2m交易成功|操作%d|$%s|订单号:%s|用户编号:%d|交易时间:%s\033[0m\n", payorder.Type, payorder.Price, payorder.Orderid, payorder.Studentid, paytime.Format("2006-01-02 15:04:05"))
-				fmt.Println("======================end==============================")
+				fmt.Println("====================================================")
 				manager.Count[0]++
 			} else {
 				//交易失败
@@ -110,35 +110,24 @@ func (manager *Yhcv2) Run(list_key string, secret string, order_config interface
 				fmt.Println("====================================================")
 
 				fmt.Println("重发次数", payorder.Resend)
-
+				//！！！异常订单处理 在这里设置重发次数和时间间隔
 				if payorder.Resend >= manager.ResendNum {
-					fmt.Printf("\033[7;33;2m重试次数超出限制 %d 已终止\033[0m\n", manager.Count[1])
+					fmt.Printf("\033[7;33;2m重试次数超出限制 %d 已终止\033[0m\n", manager.ResendNum)
 					manager.BadOrderProcess(payorder, pay_error)
 					continue
 				}
 				time.Sleep(time.Duration(payorder.Resend*100) * time.Millisecond)
 				manager.FailCope <- order
-				continue
-				//！！！异常订单处理 在这里设置重发次数和时间间隔
-				manager.Count[1]++
-				time.Sleep(time.Duration(manager.ResendTime) * time.Duration(manager.Count[1]) * time.Millisecond)
-				fmt.Printf("第 %d 次尝试\n", manager.Count[1])
-				if manager.Count[1] == manager.ResendNum {
-					fmt.Printf("\033[7;33;2m重试次数超出限制 %d 已终止\033[0m\n", manager.Count[1])
-
-					manager.BadOrderProcess(payorder, pay_error)
-					manager.Count[1] = 0
-				}
 			}
 
-			time.Sleep(time.Duration(manager.ResendTime) * time.Millisecond)
+			time.Sleep(time.Duration(manager.ResendTime) * time.Millisecond) //给接口的反应的时间提高成功率
 			fmt.Printf("操作成功 %d 条订单\n", manager.Count[0])
 
 		default:
-			redisClient := redis_factory.GetOneRedisClient()
-			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 0))
+			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 30))
 			if err != nil {
-				fmt.Println("err", err)
+				fmt.Println("读取新订单列表数据", err)
+				continue
 			}
 			manager.Order = string(res)
 			manager.Cope <- 1 //处理订单
@@ -147,34 +136,30 @@ func (manager *Yhcv2) Run(list_key string, secret string, order_config interface
 }
 
 func (h *Yhcv2) BadOrderProcess(bad_order model.Payorder, err_msg error) {
-	// redisClient := h.RedisClient
-	redisClient := redis_factory.GetOneRedisClient()
+	redisClient := h.RedisClient
+	fmt.Println("h.Order", h.Order)
 	bad_order.Error = err_msg.Error()
 	bad, _ := json.Marshal(bad_order)
 	redisClient.Int64(redisClient.Execute("LPUSH", h.List_key+"Bad", string(bad)))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key, 0, h.Order))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key+"OrderFail", 0, h.Order))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, h.Order))
-	// redisClient.ReleaseOneRedisClient()
 }
 
 func (h *Yhcv2) FailOrderProcess() {
-	redisClient := h.RedisClient
 	for {
 		select {
-		// x = <- ch
 		case fail_order := <-h.FailCope:
 			fmt.Println("尝试处理异常订单...", fail_order)
-
+			redisClient := redis_factory.GetOneRedisClient()
 			_, err := redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, fail_order))
 			if err != nil {
-				fmt.Println("从备份里删除异常订单", err)
+				fmt.Println("从备份里取出异常订单", err)
 				continue
 			}
-
 			_, err = redisClient.Int64(redisClient.Execute("LREM", h.List_key+"OrderFail", 0, fail_order))
 			if err != nil {
-				fmt.Println("删除异常订单", err)
+				fmt.Println("取出异常订单", err)
 				continue
 			}
 			order := model.Payorder{}
@@ -192,6 +177,7 @@ func (h *Yhcv2) FailOrderProcess() {
 				fmt.Println("将异常订单重新加入列表", err)
 				continue
 			}
+			redisClient.ReleaseOneRedisClient()
 		}
 	}
 }
@@ -229,7 +215,7 @@ func (h *Yhcv2) Process(order model.Payorder) error {
 	case 2:
 		return h.Buyget(order)
 	default:
-		return fmt.Errorf("接口错误 非预期返回值")
+		return fmt.Errorf("错误 未识别业务类型")
 	}
 }
 
@@ -244,7 +230,7 @@ func (h *Yhcv2) Recharge(order model.Payorder) error {
 		PayType:        "2",
 		Amount:         Amount,
 		ReceiptsAmount: Amount,
-		Remarks:        order.From + "|" + order.Orderid,
+		Remarks:        order.Orderid,
 	}
 	var token, err = h.Token()
 	if err != nil {
@@ -281,7 +267,7 @@ func (h *Yhcv2) Buyget(order model.Payorder) error {
 		Amount:          Amount,
 		SubsidiesAmount: 0,
 		GiftAmount:      0,
-		Remarks:         order.From + "|" + order.Orderid,
+		Remarks:         order.Orderid,
 		AuthkeyType:     1,
 	}
 

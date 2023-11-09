@@ -38,7 +38,6 @@ func (RecordInfo) TableName() string {
 func (r *RecordInfo) List(empID string, Stime string, Etime string) (temp []RecordInfo) {
 	tablename := r.TableTransMean(Etime)
 	fmt.Println("tablename", tablename)
-	fmt.Println("empID", empID)
 	sql := `SELECT  TOP 10 ` + tablename + `.*,Terminal_Info.TerminalName
 		FROM ` + tablename + ` JOIN Terminal_Info
 		ON ` + tablename + `.TerminalNo = Terminal_Info.TerminalNo
@@ -76,36 +75,3 @@ func (r *RecordInfo) TableTransMean(times string) string {
 	}
 	return table
 }
-
-// func (rs *RecordInfo) Add(payorder model.Payorder) (ok bool) { //充值
-// 	employee, err := RecordInfoFactory("").Fetch(payorder.Studentid)
-// 	if err != nil {
-// 		fmt.Println(err)
-// 		return
-// 	}
-// 	dealtime := time.Unix(payorder.Dealtime, 0)
-// 	createtime := time.Unix(payorder.Created_at, 0)
-// 	var blance = employee.AfterPay - payorder.Price
-// 	result := rs.Omit("operate_type", "ID", "updated_at", "created_at", "Clock_name", "din_room_name").Create(&RecordInfo{
-// 		Clockid:        payorder.Macid,
-// 		Empid:          payorder.Studentid,
-// 		Opdate:         dealtime.Format("2006-01-02 15:04:05"),
-// 		GetTime:        createtime.Format("2006-01-02 15:04:05"),
-// 		CardSequ:       employee.CardSequ + 1,
-// 		Money:          payorder.Price,
-// 		Balance:        blance,
-// 		Mealtype:       "6",
-// 		Kind:           "6",
-// 		Cardid:         payorder.Orderid,
-// 		Accountid:      employee.Accountid,
-// 		OpUser:         payorder.From,
-// 		SubsidyConsume: "0",
-// 	})
-// 	if result.Error != nil {
-// 		fmt.Println("处理交易失败")
-// 		return false
-// 	} else {
-// 		EmployeeFactory("").UpdateEmployee(employee.UserNO, blance, employee.CardSequ+1) //更新人事表
-// 		return true
-// 	}
-// }

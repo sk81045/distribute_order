@@ -67,7 +67,6 @@ func (rs *Employee) UpdateEmployee(empID int, blance float64, sq int) {
 	if result.Error != nil {
 		panic("处理交易记录失败")
 	} else {
-		fmt.Println("=====================start=============================")
 		fmt.Println("更新余额$", blance)
 	}
 }
