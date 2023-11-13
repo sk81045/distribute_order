@@ -62,11 +62,13 @@ func (manager *Yhcv2) Run(list_key string, secret string, order_config interface
 	manager.Count = make([]int64, 3) //任务计数器
 	manager.RedisClient = redis_factory.GetOneRedisClient()
 	/*******************************************************************/
-	redisClient := manager.RedisClient
+	// redisClient := manager.RedisClient
+	// redisClient := redis_factory.GetOneRedisClient()
 	go manager.FailOrderProcess()
 	for {
 		select {
 		case <-manager.Cope:
+			redisClient := manager.RedisClient
 			payorder := model.Payorder{}
 			if err := json.Unmarshal([]byte(manager.Order), &payorder); err != nil {
 				fmt.Println("序列化失败", err)
@@ -116,15 +118,18 @@ func (manager *Yhcv2) Run(list_key string, secret string, order_config interface
 					manager.BadOrderProcess(payorder, pay_error)
 					continue
 				}
+				redisClient.ReleaseOneRedisClient()
 				time.Sleep(time.Duration(payorder.Resend*100) * time.Millisecond)
 				manager.FailCope <- order
 			}
 
+			redisClient.ReleaseOneRedisClient()
 			time.Sleep(time.Duration(manager.ResendTime) * time.Millisecond) //给接口的反应的时间提高成功率
 			fmt.Printf("操作成功 %d 条订单\n", manager.Count[0])
-
 		default:
-			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 30))
+			manager.RedisClient = redis_factory.GetOneRedisClient()
+			redisClient := manager.RedisClient
+			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 0))
 			if err != nil {
 				fmt.Println("读取新订单列表数据", err)
 				continue
@@ -137,13 +142,13 @@ func (manager *Yhcv2) Run(list_key string, secret string, order_config interface
 
 func (h *Yhcv2) BadOrderProcess(bad_order model.Payorder, err_msg error) {
 	redisClient := h.RedisClient
-	fmt.Println("h.Order", h.Order)
 	bad_order.Error = err_msg.Error()
 	bad, _ := json.Marshal(bad_order)
 	redisClient.Int64(redisClient.Execute("LPUSH", h.List_key+"Bad", string(bad)))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key, 0, h.Order))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key+"OrderFail", 0, h.Order))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, h.Order))
+	redisClient.ReleaseOneRedisClient()
 }
 
 func (h *Yhcv2) FailOrderProcess() {

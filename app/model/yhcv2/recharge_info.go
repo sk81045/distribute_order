@@ -22,7 +22,7 @@ type RechargeInfo struct {
 	Money        float64 `gorm:"column:Amount" json:"price"`
 	Balance      float64 `gorm:"column:Balance" json:"balance"`
 	BusinessType string  `gorm:"column:BusinessType"`
-	Orderid      string  `gorm:"column:SerialNo" json:"orderid"`
+	Orderid      string  `gorm:"column:OrderID" json:"orderid"`
 	Remark       string  `gorm:"column:Remarks" json:"remark"`
 	Terminal
 }
@@ -41,6 +41,20 @@ func (m *RechargeInfo) List(empID string, Stime string, Etime string) (temp []Re
 		BETWEEN ? AND ?
 		ORDER BY Recharge_Info.RechargeTime DESC`
 	if res := m.Raw(sql, empID, Stime, Etime).Find(&temp); res.RowsAffected > 0 {
+		return temp
+	}
+	return nil
+}
+
+// 查询
+func (m *RechargeInfo) GetOrder(empID string, Oid string) (temp []RechargeInfo) {
+	sql := `SELECT TOP 10 Recharge_Info.*,Terminal_Info.TerminalName
+		FROM Recharge_Info JOIN Terminal_Info
+		ON Recharge_Info.TerminalNo = Terminal_Info.TerminalNo
+		WHERE Recharge_Info.MemberID = ?
+		OR Recharge_Info.Remarks = ?
+		ORDER BY Recharge_Info.RechargeTime DESC`
+	if res := m.Raw(sql, empID, Oid).Find(&temp); res.RowsAffected > 0 {
 		return temp
 	}
 	return nil

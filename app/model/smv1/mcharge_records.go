@@ -76,6 +76,20 @@ ORDER BY MChargeRecords.ID DESC`
 	return nil
 }
 
+func (m *MChargeRecords) GetOrder(empID string, Oid string) (temp []MChargeRecords) {
+	sql := `SELECT top 50 *
+FROM MChargeRecords JOIN Clocks
+ON MChargeRecords.clock_id = Clocks.Clock_id
+JOIN DinRoom
+ON Clocks.DinRoom_id = DinRoom.DinRoom_id 
+WHERE MChargeRecords.emp_id = ? OR MChargeRecords.card_id = ?
+ORDER BY MChargeRecords.ID DESC`
+	if res := m.Raw(sql, empID, Oid).Find(&temp); res.RowsAffected > 0 {
+		return temp
+	}
+	return nil
+}
+
 func (rs *MChargeRecords) Add(payorder model.Payorder) error { //充值
 	employee, err := EmployeeFactory("").Fetch(payorder.Studentid)
 	if err != nil {

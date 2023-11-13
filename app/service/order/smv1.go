@@ -32,14 +32,13 @@ func (h *Smv1) Run(list_key string, secret string, order_config interface{}) {
 	h.ResendNum = resendnum
 	resentime, _ := strconv.ParseInt(fmt.Sprintf("%d", order_config.(map[string]interface{})["resendtime"]), 10, 64)
 	h.ResendTime = resentime
-	h.RedisClient = redis_factory.GetOneRedisClient()
 	/*******************************************************************/
 	go h.FailOrderProcess()
 
-	redisClient := h.RedisClient
 	for {
 		select {
 		case <-h.Cope:
+			redisClient := h.RedisClient
 			payorder := model.Payorder{}
 			if err := json.Unmarshal([]byte(h.Order), &payorder); err != nil {
 				fmt.Println("序列化失败", err)
@@ -82,7 +81,7 @@ func (h *Smv1) Run(list_key string, secret string, order_config interface{}) {
 
 				h.Count[0]++
 			} else { //交易失败
-				h.RedisClient.Int64(h.RedisClient.Execute("LPUSH", list_key+"OrderFail", order)) //加入异常列表
+				redisClient.Int64(redisClient.Execute("LPUSH", list_key+"OrderFail", order)) //加入异常列表
 
 				//！！！异常订单处理 在这里设置重发次数和时间间隔
 				fmt.Printf("\033[7;31;2m交易失败!|操作%d|$%s|订单号:%s|用户编号:%d|交易时间:%s\033[0m\n", payorder.Type, payorder.Price, payorder.Orderid, payorder.Studentid, paytime.Format("2006-01-02 15:04:05"))
@@ -93,13 +92,18 @@ func (h *Smv1) Run(list_key string, secret string, order_config interface{}) {
 					h.BadOrderProcess(payorder, pay_error)
 					continue
 				}
+				redisClient.ReleaseOneRedisClient()
 				time.Sleep(time.Duration(payorder.Resend*100) * time.Millisecond)
 				h.FailCope <- order
 			}
+
+			redisClient.ReleaseOneRedisClient()
 			time.Sleep(time.Duration(h.ResendTime) * time.Millisecond)
 			fmt.Printf("操作成功 %d 条订单\n", h.Count[0])
 		default:
-			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 30))
+			h.RedisClient = redis_factory.GetOneRedisClient()
+			redisClient := h.RedisClient
+			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 0))
 			if err != nil {
 				fmt.Println("读取新订单列表数据", err)
 				continue
@@ -117,7 +121,7 @@ func (h *Smv1) BadOrderProcess(bad_order model.Payorder, err_msg error) {
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key, 0, h.Order))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key+"OrderFail", 0, h.Order))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, h.Order))
-	// redisClient.ReleaseOneRedisClient()
+	redisClient.ReleaseOneRedisClient()
 }
 
 func (h *Smv1) FailOrderProcess() {

@@ -35,7 +35,6 @@ func (u *Smv1) RecordList(context *gin.Context) {
 
 	temp1 := make([]model.DealRecord, len(chargeList))
 	for k, value := range chargeList {
-		// fmt.Println("temp1 value", value)
 		temp1[k].ID = value.Id
 		temp1[k].User = fmt.Sprintf("%d", value.Empid)
 		temp1[k].Orderid = value.Cardid
@@ -82,7 +81,43 @@ func (u *Smv1) RecordList(context *gin.Context) {
 	}
 }
 
-// 消费记录
+// 消费记录根据条件查询
+func (u *Smv1) GetOrder(context *gin.Context) {
+	type Params struct { //类型绑定
+		Pid string `form:"pid" json:"pid"  binding:"required"`
+		Oid string `form:"oid" json:"oid"  binding:"required"`
+	}
+	var p Params
+	if context.ShouldBindQuery(&p) != nil { //ShouldBindQuery 函数只绑定Get参数
+		fmt.Printf("====== 查询参数错误 pid:%s Oid:%s =====\n", p.Pid, p.Oid)
+	}
+	chargeList := smv1.MChargeRecordsFactory("").GetOrder(p.Pid, p.Oid)
+	temp1 := make([]model.DealRecord, len(chargeList))
+	for k, value := range chargeList {
+		temp1[k].ID = value.Id
+		temp1[k].User = fmt.Sprintf("%d", value.Empid)
+		temp1[k].Orderid = value.Cardid
+		temp1[k].Macid = value.Clockid
+		temp1[k].Counterparty = value.DinRoom_name
+		temp1[k].Kind = value.Clock_name
+		temp1[k].Cooperation = value.OpUser
+		temp1[k].Operate = "1"
+		temp1[k].Money = value.Money
+		temp1[k].Balance = value.Balance
+		temp1[k].Createdat = value.GetTime
+		temp1[k].Dealtime = value.Opdate
+	}
+	if chargeList != nil {
+		response.Success(context, consts.CurdStatusOkMsg, gin.H{
+			"list":  chargeList,
+			"count": len(chargeList),
+		})
+	} else {
+		response.Fail(context, consts.CurdSelectFailCode, consts.CurdSelectFailMsg, "")
+	}
+}
+
+// 用户信息
 func (u *Smv1) UserInfo(context *gin.Context) {
 	type Params struct { //类型绑定
 		Pid string `form:"pid" json:"pid"  binding:"required"`
@@ -181,5 +216,5 @@ func (y *Smv1) redisList(list_key string, num int, pid string, ic string) {
 			fmt.Println("err", err)
 		}
 	}
-	// redisClient.ReleaseOneRedisClient()
+	redisClient.ReleaseOneRedisClient()
 }

@@ -89,6 +89,52 @@ func (y *Yhcv2) RecordList(context *gin.Context) {
 	}
 }
 
+// 根据条件获取订单
+func (y *Yhcv2) GetOrder(context *gin.Context) {
+
+	type Params struct { //类型绑定
+		Pid string `form:"pid"`
+		Oid string `form:"oid"`
+	}
+	var p Params
+	if context.ShouldBindQuery(&p) != nil { //ShouldBindQuery 函数只绑定Get参数
+		fmt.Printf("====== 根据条件获取订单 pid:%s oid:%s=====\n", p.Pid, p.Oid)
+	}
+
+	user, err := yhcv2.MermberFactory("").GetMemberInfo(p.Pid)
+	if err != nil {
+		response.Fail(context, consts.CurdSelectFailCode, consts.CurdSelectFailMsg, err.Error())
+		return
+	}
+	fmt.Println("user", user)
+
+	chargeList := yhcv2.RechargeInfoFactory("").GetOrder(user.ID, p.Oid)
+	temp2 := make([]model.DealRecord, len(chargeList))
+	for k, value := range chargeList {
+		temp2[k].User = value.ID
+		temp2[k].Ic = value.Ic
+		temp2[k].Orderid = value.Orderid
+		temp2[k].Macid = value.Clockid
+		temp2[k].Counterparty = value.TerminalName
+		temp2[k].Kind = value.BusinessType
+		temp2[k].Cooperation = value.OpUser
+		temp2[k].Operate = "1" //z款
+		temp2[k].Money = value.Money
+		temp2[k].Balance = value.Balance
+		temp2[k].Createdat = value.Createdat
+		temp2[k].Dealtime = value.Dealtime
+		temp2[k].Remark = value.Remark
+	}
+	if chargeList != nil {
+		response.Success(context, consts.CurdStatusOkMsg, gin.H{
+			"count": len(chargeList),
+			"list":  chargeList,
+		})
+	} else {
+		response.Fail(context, consts.CurdSelectFailCode, consts.CurdSelectFailMsg, "")
+	}
+}
+
 func (y *Yhcv2) Season(times string) string {
 	s, _ := time.Parse("2006-01-02 15:04:05", times)
 	month := int(s.Month())
@@ -261,11 +307,11 @@ func (y *Yhcv2) redisList(list_key string, num int, pid string) {
 		id := fmt.Sprintf("%d", i)
 		// list, _ := yhcv2.MermberFactory("").GetMembers(1, p.Limit)
 
-		orlist := `{"id":` + id + `,"sid":44,"pid":6019,"lid":0,"student_id":` + pid + `,"ic":"","orderid":"` + orderid + `","price":` + m + `,"macid":"150","type":` + ty + `,"from":"农行支付","paystatus":true,"category":"3","sync":false,"created_at":` + t + `,"dealtime":` + dt + `}`
+		orlist := `{"id":` + id + `,"sid":44,"pid":6019,"lid":0,"student_id":` + pid + `,"ic":"","orderid":"` + orderid + `","price":"` + m + `","macid":"150","type":` + ty + `,"from":"农行支付","paystatus":true,"category":"3","sync":false,"created_at":` + t + `,"dealtime":` + dt + `}`
 
 		sign := sign.Create(orlist, variable.ConfigYml.GetString("App.Secret"))
 		// fmt.Println("orlist", orlist)
-		list := `{"id":` + id + `,"sid":44,"pid":6019,"lid":0,"student_id":` + pid + `,"ic":"","orderid":"` + orderid + `","price":` + m + `,"macid":"150","type":` + ty + `,"from":"农行支付","paystatus":true,"category":"3","sync":false,"created_at":` + t + `,"dealtime":` + dt + `,"sign":"` + sign + `"}`
+		list := `{"id":` + id + `,"sid":44,"pid":6019,"lid":0,"student_id":` + pid + `,"ic":"","orderid":"` + orderid + `","price":"` + m + `","macid":"150","type":` + ty + `,"from":"农行支付","paystatus":true,"category":"3","sync":false,"created_at":` + t + `,"dealtime":` + dt + `,"sign":"` + sign + `"}`
 
 		_, err := redisClient.Int64(redisClient.Execute("LPUSH", list_key, list))
 		if err != nil {
