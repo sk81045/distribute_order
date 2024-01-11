@@ -31,7 +31,8 @@ func (u *Smv1) RecordList(context *gin.Context) {
 	}
 
 	chargeList := smv1.MChargeRecordsFactory("").List(p.Pid, p.Stime, p.Etime)
-	mealList := smv1.MealRecordsFactory("").List(p.Pid, p.Stime, p.Etime)
+	mealList1 := smv1.MealRecordsFactory("").List1(p.Pid, p.Stime, p.Etime)
+	mealList2 := smv1.MealRecordsFactory("").List2(p.Pid, p.Stime, p.Etime)
 
 	temp1 := make([]model.DealRecord, len(chargeList))
 	for k, value := range chargeList {
@@ -49,8 +50,8 @@ func (u *Smv1) RecordList(context *gin.Context) {
 		temp1[k].Dealtime = value.Opdate
 	}
 
-	temp2 := make([]model.DealRecord, len(mealList))
-	for k, value := range mealList {
+	temp2 := make([]model.DealRecord, len(mealList1))
+	for k, value := range mealList1 {
 		// temp2[k].ID = value.Id
 		temp2[k].User = fmt.Sprintf("%d", value.Empid)
 		temp2[k].Orderid = value.Cardid
@@ -65,14 +66,30 @@ func (u *Smv1) RecordList(context *gin.Context) {
 		temp2[k].Dealtime = value.Opdate
 	}
 
+	temp3 := make([]model.DealRecord, len(mealList2))
+	for k, value := range mealList2 {
+		// temp2[k].ID = value.Id
+		temp3[k].User = fmt.Sprintf("%d", value.Empid)
+		temp3[k].Orderid = value.Cardid
+		temp3[k].Macid = value.Clockid
+		temp3[k].Counterparty = value.DinRoom_name
+		temp3[k].Kind = value.Clock_name
+		temp3[k].Cooperation = value.OpUser
+		temp3[k].Operate = "-1"
+		temp3[k].Money = value.Money
+		temp3[k].Balance = value.Balance
+		temp3[k].Createdat = value.GetTime
+		temp3[k].Dealtime = value.Opdate
+	}
 	newlist := append(temp1, temp2...)
+	newlist = append(newlist, temp3...)
 	fmt.Printf("====== 查询参数 pid:%s stime:%s etime:%s 获取%d条数据===\n", p.Pid, p.Stime, p.Etime, len(newlist))
 
 	if newlist != nil {
 		response.Success(context, consts.CurdStatusOkMsg, gin.H{
 			"list":         newlist,
 			"count":        len(newlist),
-			"meal_count":   len(mealList),
+			"meal_count":   len(mealList1) + len(mealList2),
 			"chrage_count": len(chargeList),
 		})
 	} else {

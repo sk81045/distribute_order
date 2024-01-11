@@ -65,8 +65,11 @@ func (y *Yhcv2) RecordList(context *gin.Context) {
 		temp2[k].Macid = value.Clockid
 		temp2[k].Counterparty = value.TerminalName
 		temp2[k].Kind = value.BusinessType
-		temp2[k].Cooperation = value.OpUser
 		temp2[k].Operate = "1" //z款
+		if value.BusinessType == "现金扣除" {
+			temp2[k].Operate = "-1"
+		}
+		temp2[k].Cooperation = value.OpUser
 		temp2[k].Money = value.Money
 		temp2[k].Balance = value.Balance
 		temp2[k].Createdat = value.Createdat
@@ -215,7 +218,7 @@ func (u *Yhcv2) UserInfo(context *gin.Context) {
 		case "3":
 			info.CardState = "挂失卡"
 		case "8":
-			info.CardState = "正常卡"
+			info.CardState = "正常"
 		default:
 			info.CardState = "未知"
 		}
@@ -225,11 +228,11 @@ func (u *Yhcv2) UserInfo(context *gin.Context) {
 	}
 }
 
-// 消费记录
+// 成员
 func (y *Yhcv2) MemberList(context *gin.Context) {
 	type Params struct { //类型绑定
-		Page  int `form:"page" json:"page"  binding:"required"`
-		Limit int `form:"limit" json:"limit"  binding:"required"`
+		Page  int64 `form:"page" json:"page"  binding:"required"`
+		Limit int64 `form:"limit" json:"limit"  binding:"required"`
 	}
 	var p *Params
 
@@ -239,7 +242,7 @@ func (y *Yhcv2) MemberList(context *gin.Context) {
 		return
 	}
 
-	list, err := yhcv2.MermberFactory("").GetMembers(p.Page, p.Limit)
+	list, err := yhcv2.MermberFactory("").GetMembers(p.Page, p.Limit, "")
 
 	for _, v := range list {
 		fmt.Println("list", v.UserNO)
@@ -266,7 +269,7 @@ func (y *Yhcv2) SetList(context *gin.Context) {
 		fmt.Println("====== 添加订单 ======")
 	}
 
-	list, _ := yhcv2.MermberFactory("").GetMembers(1, 5)
+	list, _ := yhcv2.MermberFactory("").GetMembers(1, 5, "")
 
 	for _, v := range list {
 		fmt.Println("list", v.UserNO)
@@ -282,8 +285,8 @@ func (y *Yhcv2) SetList(context *gin.Context) {
 
 // 测试 redis 连接池
 func (y *Yhcv2) redisList(list_key string, num int, pid string) {
-	redisClient := redis_factory.GetOneRedisClient()
 	for i := 1; i <= num; i++ {
+		redisClient := redis_factory.GetOneRedisClient()
 		rand.Seed(time.Now().UnixNano())
 		mm := rand.Intn(5)
 		if mm == 0 {
@@ -307,16 +310,17 @@ func (y *Yhcv2) redisList(list_key string, num int, pid string) {
 		id := fmt.Sprintf("%d", i)
 		// list, _ := yhcv2.MermberFactory("").GetMembers(1, p.Limit)
 
-		orlist := `{"id":` + id + `,"sid":44,"pid":6019,"lid":0,"student_id":` + pid + `,"ic":"","orderid":"` + orderid + `","price":"` + m + `","macid":"150","type":` + ty + `,"from":"农行支付","paystatus":true,"category":"3","sync":false,"created_at":` + t + `,"dealtime":` + dt + `}`
+		orlist := `{"id":` + id + `,"sid":44,"pid":6019,"lid":0,"student_id":` + pid + `,"ic":"","orderid":"` + orderid + `","price":"` + m + `","macid":"150","type":` + ty + `,"from":"农行支付","paystatus":1,"category":"3","sync":1,"created_at":` + t + `,"dealtime":` + dt + `}`
 
 		sign := sign.Create(orlist, variable.ConfigYml.GetString("App.Secret"))
 		// fmt.Println("orlist", orlist)
-		list := `{"id":` + id + `,"sid":44,"pid":6019,"lid":0,"student_id":` + pid + `,"ic":"","orderid":"` + orderid + `","price":"` + m + `","macid":"150","type":` + ty + `,"from":"农行支付","paystatus":true,"category":"3","sync":false,"created_at":` + t + `,"dealtime":` + dt + `,"sign":"` + sign + `"}`
+		list := `{"id":` + id + `,"sid":44,"pid":6019,"lid":0,"student_id":` + pid + `,"ic":"","orderid":"` + orderid + `","price":"` + m + `","macid":"150","type":` + ty + `,"from":"农行支付","paystatus":1,"category":"3","sync":1,"created_at":` + t + `,"dealtime":` + dt + `,"sign":"` + sign + `"}`
 
 		_, err := redisClient.Int64(redisClient.Execute("LPUSH", list_key, list))
 		if err != nil {
 			fmt.Println("err", err)
 		}
+		redisClient.ReleaseOneRedisClient()
 	}
-	redisClient.ReleaseOneRedisClient()
+
 }

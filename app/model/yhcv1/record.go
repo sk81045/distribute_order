@@ -1,6 +1,7 @@
 package yhcv1
 
 import (
+	"fmt"
 	"goskeleton/app/model"
 )
 
@@ -33,7 +34,7 @@ func (FlowRecord) TableName() string {
 
 // 查询
 func (r *FlowRecord) List(empID int64, Stime string, Etime string) (temp []FlowRecord) {
-	sql := `SELECT top 100 * FROM 
+	sql := `SELECT top 300 * FROM 
 			FlowRecord JOIN DevGrpAndDev
 			ON FlowRecord.macID = DevGrpAndDev.devID
 			JOIN DevGrp
@@ -48,4 +49,38 @@ func (r *FlowRecord) List(empID int64, Stime string, Etime string) (temp []FlowR
 		return temp
 	}
 	return nil
+}
+
+// 查询
+func (f *FlowRecord) GetOrder(empID string, Oid string) (temp []FlowRecord) {
+	sql := `SELECT top 300 * FROM 
+			FlowRecord JOIN DevGrpAndDev
+			ON FlowRecord.macID = DevGrpAndDev.devID
+			JOIN DevGrp
+			ON DevGrpAndDev.devgrpID = DevGrp.devgrpID
+			JOIN DevInfo
+			ON DevGrpAndDev.devID = DevInfo.devID
+			WHERE FlowRecord.userNO = ? 
+			AND FlowRecord.PayListNO = ? 
+			ORDER BY FlowRecord.FID DESC`
+	if res := f.Raw(sql, empID, Oid).Find(&temp); res.RowsAffected > 0 {
+		return temp
+	}
+	return nil
+}
+
+type AggregateTemp struct {
+	DevgrpID   int     `gorm:"column:devgrpID"`
+	Devgrpname string  `gorm:"column:devgrpname"`
+	Cnt        int     `gorm:"column:cnt"`
+	Totalmoney float64 `gorm:"column:totalmeony"`
+}
+
+// 消费汇总
+func (r *FlowRecord) Aggregate(Stime string, Etime string) (temp []AggregateTemp, er error) {
+	sql := `select DevGrp.devgrpID,devgrpname,count(*) cnt ,sum(payMoney) totalmeony from FlowRecord,CardInfo,UserInfo,devgrpAndDev,dbo.DevGrp where FlowRecord.userNO=CardInfo.UserNO and CardInfo.UserNO=UserInfo.UserNO  and FlowRecord.payTime >= ? and FlowRecord.payTime < ? and macID=devID and devgrpAndDev.devgrpID=DevGrp.devgrpID group by DevGrp.devgrpID,devgrpname`
+	if res := r.Raw(sql, Stime, Etime).Find(&temp); res.RowsAffected > 0 {
+		return temp, nil
+	}
+	return nil, fmt.Errorf("查询失败未找到信息")
 }

@@ -9,6 +9,7 @@ import (
 	"goskeleton/app/utils/redis_factory"
 	"goskeleton/app/utils/sign"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -40,15 +41,13 @@ func (manager *Yhcv1) Run(list_key string, secret string, order_config interface
 	manager.Cope = make(chan int, 3)        //任务执行信号
 	manager.Count = make([]int64, 3)        //任务计数器
 	manager.FailCope = make(chan string, 1) //异常订单执行信号
-	manager.RedisClient = redis_factory.GetOneRedisClient()
 	/*******************************************************************/
 
 	go manager.FailOrderProcess()
-
-	redisClient := manager.RedisClient
 	for {
 		select {
 		case <-manager.Cope:
+			redisClient := manager.RedisClient
 			payorder := model.Payorder{}
 			if err := json.Unmarshal([]byte(manager.Order), &payorder); err != nil {
 				fmt.Println("序列化失败", err)
@@ -100,9 +99,11 @@ func (manager *Yhcv1) Run(list_key string, secret string, order_config interface
 			time.Sleep(time.Duration(manager.ResendTime) * time.Millisecond)
 			fmt.Printf("操作成功 %d 条订单\n", manager.Count[0])
 		default:
+			manager.RedisClient = redis_factory.GetOneRedisClient()
+			redisClient := manager.RedisClient
 			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 30))
 			if err != nil {
-				fmt.Println("读取新订单列表数据", err)
+				log.Println("读取新订单列表数据", err)
 				continue
 			}
 			manager.Order = string(res)
@@ -115,11 +116,11 @@ func (h *Yhcv1) BadOrderProcess(bad_order model.Payorder, err_msg error) {
 	redisClient := h.RedisClient
 	bad_order.Error = err_msg.Error()
 	bad, _ := json.Marshal(bad_order)
-	redisClient.Int64(redisClient.Execute("LPUSH", h.List_key+"Bad", string(bad)))
+	redisClient.Int64(redisClient.Execute("LPUSH", "OrderBad", string(bad)))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key, 0, h.Order))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key+"OrderFail", 0, h.Order))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, h.Order))
-	// redisClient.ReleaseOneRedisClient()
+	redisClient.ReleaseOneRedisClient()
 }
 
 func (h *Yhcv1) FailOrderProcess() {
@@ -127,22 +128,24 @@ func (h *Yhcv1) FailOrderProcess() {
 		select {
 		case fail_order := <-h.FailCope:
 			fmt.Println("尝试处理异常订单...", fail_order)
-			redisClient := redis_factory.GetOneRedisClient()
-			_, err := redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, fail_order))
-			if err != nil {
-				fmt.Println("从备份里取出异常订单", err)
-				continue
-			}
-			_, err = redisClient.Int64(redisClient.Execute("LREM", h.List_key+"OrderFail", 0, fail_order))
-			if err != nil {
-				fmt.Println("取出异常订单", err)
-				continue
-			}
+
 			order := model.Payorder{}
 			if err := json.Unmarshal([]byte(fail_order), &order); err != nil {
 				fmt.Println("异常订单序列化失败", err)
 				h.BadOrderProcess(order, err)
-				continue
+			}
+
+			redisClient := redis_factory.GetOneRedisClient()
+			// defer
+			_, err := redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, fail_order))
+			if err != nil {
+				fmt.Println("从备份里取出异常订单", err)
+				h.BadOrderProcess(order, err)
+			}
+			_, err = redisClient.Int64(redisClient.Execute("LREM", h.List_key+"OrderFail", 0, fail_order))
+			if err != nil {
+				fmt.Println("取出异常订单", err)
+				h.BadOrderProcess(order, err)
 			}
 
 			order.Resend = order.Resend + 1
@@ -150,8 +153,7 @@ func (h *Yhcv1) FailOrderProcess() {
 			new_fail_order_str, _ := json.Marshal(order)
 			_, err = redisClient.Int64(redisClient.Execute("RPUSH", h.List_key, new_fail_order_str))
 			if err != nil {
-				fmt.Println("将异常订单重新加入列表", err)
-				continue
+				fmt.Println("异常订单重新加入列表失败", err)
 			}
 			redisClient.ReleaseOneRedisClient()
 		}
@@ -165,9 +167,9 @@ func (h *Yhcv1) failOrder(list_key string, order string) {
 func (h *Yhcv1) Process(order model.Payorder) error {
 	switch order.Type {
 	case 1:
-		return h.HttpOrder(order, "33")
+		return h.HttpOrder(order, "33") //增款
 	case 2:
-		return h.HttpOrder(order, "15")
+		return h.HttpOrder(order, "15") //减款
 	default:
 		return fmt.Errorf("接口错误 非预期返回值")
 	}
@@ -175,6 +177,7 @@ func (h *Yhcv1) Process(order model.Payorder) error {
 
 func (h *Yhcv1) HttpOrder(order model.Payorder, kind string) error {
 	dealtime := time.Unix(order.Dealtime, 0)
+	fmt.Println("交易时间", dealtime.Format("2006-01-02 15:04:05"))
 	money, _ := strconv.ParseFloat(order.Price, 64)
 	Body := yhcv1.RechargeParams{ //交易记录报文
 		AccountID: order.Studentid,

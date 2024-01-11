@@ -74,6 +74,12 @@ func (rs *RedisStore) LRange(key string, start int64, end int64) (val []string) 
 	// for _, i := range val {
 	// 	fmt.Println("GetList keys:", i)
 	// }
+}
+
+func (rs *RedisStore) LRem(key string, list string) int64 {
+	return global.H_REDIS.LRem(context.Background(), key, 0, list).Val()
+	// err := global.H_REDIS.LRem(context.Background(), key, 0, list).Val()
+	// fmt.Println("err:", err)
 
 }
 

@@ -1,7 +1,6 @@
 package yhcv2
 
 import (
-	// "fmt"
 	"goskeleton/app/model"
 	// "time"
 )
@@ -33,8 +32,8 @@ func (RechargeInfo) TableName() string {
 
 // 查询
 func (m *RechargeInfo) List(empID string, Stime string, Etime string) (temp []RechargeInfo) {
-	sql := `SELECT TOP 10 Recharge_Info.*,Terminal_Info.TerminalName
-		FROM Recharge_Info JOIN Terminal_Info
+	sql := `SELECT TOP 300 Recharge_Info.*,Terminal_Info.TerminalName
+		FROM Recharge_Info FULL OUTER JOIN  Terminal_Info
 		ON Recharge_Info.TerminalNo = Terminal_Info.TerminalNo
 		WHERE Recharge_Info.MemberID = ?
 		AND Recharge_Info.RechargeTime
@@ -48,11 +47,11 @@ func (m *RechargeInfo) List(empID string, Stime string, Etime string) (temp []Re
 
 // 查询
 func (m *RechargeInfo) GetOrder(empID string, Oid string) (temp []RechargeInfo) {
-	sql := `SELECT TOP 10 Recharge_Info.*,Terminal_Info.TerminalName
+	sql := `SELECT TOP 100 Recharge_Info.*,Terminal_Info.TerminalName
 		FROM Recharge_Info JOIN Terminal_Info
 		ON Recharge_Info.TerminalNo = Terminal_Info.TerminalNo
 		WHERE Recharge_Info.MemberID = ?
-		OR Recharge_Info.Remarks = ?
+		AND Recharge_Info.Remarks = ?
 		ORDER BY Recharge_Info.RechargeTime DESC`
 	if res := m.Raw(sql, empID, Oid).Find(&temp); res.RowsAffected > 0 {
 		return temp

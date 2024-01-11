@@ -29,7 +29,7 @@ func (MemberInfo) TableName() string {
 	return "Member_Info"
 }
 
-// 模糊查询
+// 单独查询
 func (e *MemberInfo) GetMemberInfo(key string) (*MemberInfo, error) {
 	sql := `SELECT Member_Info.*,CardType_Info.CardsName,CardType_Info.CardsNo FROM Member_Info JOIN CardType_Info
 		ON Member_Info.CardType = CardType_Info.ID
@@ -43,10 +43,13 @@ func (e *MemberInfo) GetMemberInfo(key string) (*MemberInfo, error) {
 }
 
 // 模糊查询
-func (e *MemberInfo) GetMembers(page int, limit int) (temp []MemberInfo, er error) {
+func (e *MemberInfo) GetMembers(page int64, limit int64, where string) (temp []MemberInfo, er error) {
 	page = page * limit
-	sql := `SELECT TOP ` + fmt.Sprintf("%d", limit) + ` * FROM Member_Info WHERE 
-	(MemberNo NOT IN (SELECT TOP ` + fmt.Sprintf("%d", page) + ` MemberNo FROM Member_Info ORDER BY MemberNo)) 
+	if where != "" {
+		where = where + " AND"
+	}
+	sql := `SELECT TOP ` + fmt.Sprintf("%d", limit) + ` * FROM Member_Info WHERE ` + where + `   
+	 (MemberNo NOT IN (SELECT TOP ` + fmt.Sprintf("%d", page) + ` MemberNo FROM Member_Info ORDER BY MemberNo)) 
 	ORDER BY MemberNo`
 	result := e.Raw(sql).Find(&temp)
 	if result.RowsAffected != 0 {
@@ -54,6 +57,15 @@ func (e *MemberInfo) GetMembers(page int, limit int) (temp []MemberInfo, er erro
 	} else {
 		return nil, fmt.Errorf("查询失败未找到用户信息")
 	}
+}
+
+// 用户总数
+func (e *MemberInfo) MemberNums(where string) int64 {
+	var count int64
+	sql := `SELECT COUNT(*) FROM Member_Info where 1=1 AND ` + where
+	e.Raw(sql).Count(&count)
+	fmt.Println(count)
+	return count
 }
 
 // // 查询（根据关键词模糊查询）

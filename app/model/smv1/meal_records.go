@@ -2,6 +2,7 @@ package smv1
 
 import (
 	"fmt"
+	"goskeleton/app/global/variable"
 	"goskeleton/app/model"
 	"strconv"
 	"time"
@@ -38,9 +39,10 @@ func (MealRecords) TableName() string {
 }
 
 // 查询
-func (m *MealRecords) List(empID string, Stime string, Etime string) (temp []MealRecords) {
-	sql := `SELECT top 50 MealRecordsReal.*,DinRoom.DinRoom_name, Clocks.Clock_name
-		FROM MealRecordsReal JOIN Clocks
+func (m *MealRecords) List1(empID string, Stime string, Etime string) (temp []MealRecords) {
+	sql := `SELECT top 300 MealRecordsReal.*,DinRoom.DinRoom_name, Clocks.Clock_name
+		FROM MealRecordsReal 
+		JOIN Clocks
 		ON MealRecordsReal.clock_id = Clocks.Clock_id
 		JOIN DinRoom
 		ON Clocks.DinRoom_id = DinRoom.DinRoom_id 
@@ -48,6 +50,24 @@ func (m *MealRecords) List(empID string, Stime string, Etime string) (temp []Mea
 		AND MealRecordsReal.sign_time 
 		BETWEEN ? AND ?
 		ORDER BY MealRecordsReal.ID DESC`
+	if res := m.Raw(sql, empID, Stime, Etime).Find(&temp); res.RowsAffected > 0 {
+		return temp
+	}
+	return nil
+}
+
+// 查询
+func (m *MealRecords) List2(empID string, Stime string, Etime string) (temp []MealRecords) {
+	sql := `SELECT top 300 MealRecords.*,DinRoom.DinRoom_name, Clocks.Clock_name
+		FROM MealRecords 
+		JOIN Clocks
+		ON MealRecords.clock_id = Clocks.Clock_id
+		JOIN DinRoom
+		ON Clocks.DinRoom_id = DinRoom.DinRoom_id 
+		WHERE MealRecords.emp_id = ? 
+		AND MealRecords.sign_time 
+		BETWEEN ? AND ?
+		ORDER BY MealRecords.ID DESC`
 	if res := m.Raw(sql, empID, Stime, Etime).Find(&temp); res.RowsAffected > 0 {
 		return temp
 	}
@@ -62,7 +82,9 @@ func (rs *MealRecords) Add(payorder model.Payorder) error { //充值
 	dealtime := time.Unix(payorder.Dealtime, 0)
 	createtime := time.Unix(payorder.Created_at, 0)
 	var money, _ = strconv.ParseFloat(payorder.Price, 64)
-	var blance = employee.AfterPay + money
+	//减款===============================================
+	var blance = employee.AfterPay - money
+	//===================================================
 	var mealData = MealRecords{
 		Clockid:        payorder.Macid,
 		Empid:          payorder.Studentid,
@@ -72,7 +94,7 @@ func (rs *MealRecords) Add(payorder model.Payorder) error { //充值
 		Money:          money,
 		Balance:        blance,
 		Mealtype:       "6",
-		Kind:           "6",
+		Kind:           variable.ConfigYml.GetString("Order.MealKind"),
 		Cardid:         payorder.Orderid,
 		Accountid:      employee.Accountid,
 		OpUser:         payorder.From,

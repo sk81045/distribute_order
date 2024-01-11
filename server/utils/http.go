@@ -32,6 +32,29 @@ func HttpGet(url string) string {
 	return result.String()
 }
 
+func HttpGetStatusCode(url string) (int, error) {
+	// 超时时间：5秒
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return 500, err
+	}
+	defer resp.Body.Close()
+	var buffer [512]byte
+	result := bytes.NewBuffer(nil)
+	for {
+		n, err := resp.Body.Read(buffer[0:])
+		result.Write(buffer[0:n])
+		if err != nil && err == io.EOF {
+			break
+		} else if err != nil {
+			return 50, err
+		}
+	}
+
+	return resp.StatusCode, nil
+}
+
 // 发送POST请求
 // url：         请求地址
 // data：        POST请求提交的数据

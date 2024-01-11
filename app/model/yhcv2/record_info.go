@@ -38,8 +38,9 @@ func (RecordInfo) TableName() string {
 func (r *RecordInfo) List(empID string, Stime string, Etime string) (temp []RecordInfo) {
 	tablename := r.TableTransMean(Etime)
 	fmt.Println("tablename", tablename)
-	sql := `SELECT  TOP 10 ` + tablename + `.*,Terminal_Info.TerminalName
-		FROM ` + tablename + ` JOIN Terminal_Info
+	sql := `SELECT  TOP 300 ` + tablename + `.*,Terminal_Info.TerminalName
+		FROM ` + tablename + ` 
+		FULL OUTER JOIN Terminal_Info
 		ON ` + tablename + `.TerminalNo = Terminal_Info.TerminalNo
 		WHERE ` + tablename + `.MemberID = ?
 		AND ` + tablename + `.ConsumeTime
@@ -50,6 +51,15 @@ func (r *RecordInfo) List(empID string, Stime string, Etime string) (temp []Reco
 	}
 	return nil
 }
+
+// SELECT *
+// FROM Record202304_Info
+// FULL OUTER JOIN Terminal_Info
+// ON Record202304_Info.TerminalNo = Terminal_Info.TerminalNo
+// WHERE Record202304_Info.MemberID = '3f7e95070e90498ebdab43cbc38820c3'
+// AND Record202304_Info.ConsumeTime
+// BETWEEN '2023-01-01' AND '2023-10-31'
+// ORDER BY Record202304_Info.ConsumeTime DESC
 
 func (r *RecordInfo) TableTransMean(times string) string {
 	s, _ := time.Parse("2006-01-02 15:04:05", times)
@@ -73,5 +83,7 @@ func (r *RecordInfo) TableTransMean(times string) string {
 	case 12:
 		table += fmt.Sprintf("%d", s.Year()) + "04_Info"
 	}
+	fmt.Println(" s.Year()", s.Year())
+
 	return table
 }

@@ -21,7 +21,7 @@ type Yhcv1 struct {
 func (y *Yhcv1) RecordList(context *gin.Context) {
 
 	type Params struct { //类型绑定
-		Pid   int64  `form:"pid"`
+		Pid   string `form:"pid"`
 		Stime string `form:"stime"`
 		Etime string `form:"etime"`
 	}
@@ -69,7 +69,7 @@ func (y *Yhcv1) RecordList(context *gin.Context) {
 // 获取用户
 func (u *Yhcv1) UserInfo(context *gin.Context) {
 	type Params struct { //类型绑定
-		Pid int64 `form:"pid" json:"pid"  binding:"required"`
+		Pid string `form:"pid" json:"pid"  binding:"required"`
 	}
 	var p *Params
 
@@ -102,8 +102,8 @@ func (u *Yhcv1) UserInfo(context *gin.Context) {
 // 用户列表
 func (y *Yhcv1) MemberList(context *gin.Context) {
 	type Params struct { //类型绑定
-		Page  int `form:"page" json:"page"  binding:"required"`
-		Limit int `form:"limit" json:"limit"  binding:"required"`
+		Page  int64 `form:"page" json:"page"  binding:"required"`
+		Limit int64 `form:"limit" json:"limit"  binding:"required"`
 	}
 	var p *Params
 
@@ -113,7 +113,75 @@ func (y *Yhcv1) MemberList(context *gin.Context) {
 		return
 	}
 
-	list, err := yhcv1.MermberFactory("").GetMembers(p.Page, p.Limit)
+	list, err := yhcv1.MermberFactory("").GetMembers(p.Page, p.Limit, "")
+
+	if err == nil {
+		response.Success(context, consts.CurdStatusOkMsg, list)
+	} else {
+		response.Fail(context, consts.CurdSelectFailCode, consts.CurdSelectFailMsg, "")
+	}
+}
+
+// 根据条件获取订单
+func (y *Yhcv1) GetOrder(context *gin.Context) {
+	type Params struct { //类型绑定
+		Pid string `form:"pid"`
+		Oid string `form:"oid"`
+	}
+	var p Params
+	if context.ShouldBindQuery(&p) != nil { //ShouldBindQuery 函数只绑定Get参数
+		fmt.Printf("====== 根据条件获取订单 pid:%s oid:%s=====\n", p.Pid, p.Oid)
+	}
+
+	user, err := yhcv1.MermberFactory("").GetMemberInfo(p.Pid)
+	if err != nil {
+		response.Fail(context, consts.CurdSelectFailCode, consts.CurdSelectFailMsg, err.Error())
+		return
+	}
+	fmt.Println("user", user)
+
+	list := yhcv1.RecordInfoFactory("").GetOrder(user.ID, p.Oid)
+	temp2 := make([]model.DealRecord, len(list))
+	// for k, value := range list {
+	// 	temp2[k].User = value.ID
+	// 	temp2[k].Ic = value.Ic
+	// 	temp2[k].Orderid = value.Orderid
+	// 	temp2[k].Macid = value.Clockid
+	// 	temp2[k].Counterparty = value.TerminalName
+	// 	temp2[k].Kind = value.BusinessType
+	// 	temp2[k].Cooperation = value.OpUser
+	// 	temp2[k].Operate = "1" //z款
+	// 	temp2[k].Money = value.Money
+	// 	temp2[k].Balance = value.Balance
+	// 	temp2[k].Createdat = value.Createdat
+	// 	temp2[k].Dealtime = value.Dealtime
+	// 	temp2[k].Remark = value.Remark
+	// }
+	if list != nil {
+		response.Success(context, consts.CurdStatusOkMsg, gin.H{
+			"count": len(list),
+			"temp2": temp2,
+			"list":  list,
+		})
+	} else {
+		response.Fail(context, consts.CurdSelectFailCode, consts.CurdSelectFailMsg, "")
+	}
+}
+
+// 消费汇总
+func (y *Yhcv1) Aggregate(context *gin.Context) {
+	type Params struct { //类型绑定
+		Stime string `form:"stime"`
+		Etime string `form:"etime"`
+	}
+	var p *Params
+	if context.ShouldBindQuery(&p) != nil { //ShouldBindQuery 函数只绑定Get参数
+		fmt.Printf("====== 消费汇总 参数错误 =======")
+		response.Fail(context, consts.CurdSelectFailCode, "参数错误 Limit required!", "")
+		return
+	}
+
+	list, err := yhcv1.RecordInfoFactory("").Aggregate(p.Stime, p.Etime)
 
 	if err == nil {
 		response.Success(context, consts.CurdStatusOkMsg, list)
@@ -138,7 +206,7 @@ func (y *Yhcv1) SetList(context *gin.Context) {
 	// y.redisList(p.Sid, p.Num, p.Pid)
 	// return
 
-	list, _ := yhcv1.MermberFactory("").GetMembers(1, 5)
+	list, _ := yhcv1.MermberFactory("").GetMembers(1, 5, "")
 
 	for _, v := range list {
 		fmt.Println("list", v.UserNO)

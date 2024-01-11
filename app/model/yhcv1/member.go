@@ -30,7 +30,7 @@ func (MemberInfo) TableName() string {
 }
 
 // 查询
-func (e *MemberInfo) GetMemberInfo(key int64) (*MemberInfo, error) {
+func (e *MemberInfo) GetMemberInfo(key string) (*MemberInfo, error) {
 	sql := `SELECT CardInfo.*,LevelInfo.LevelName,LevelInfo.Level_id  
 		FROM CardInfo JOIN LevelInfo
 		ON CardInfo.cardLevel = LevelInfo.level_id
@@ -44,9 +44,12 @@ func (e *MemberInfo) GetMemberInfo(key int64) (*MemberInfo, error) {
 }
 
 // 模糊查询
-func (e *MemberInfo) GetMembers(page int, limit int) (temp []MemberInfo, er error) {
+func (e *MemberInfo) GetMembers(page int64, limit int64, where string) (temp []MemberInfo, er error) {
 	page = page * limit
-	sql := `SELECT TOP ` + fmt.Sprintf("%d", limit) + ` * FROM CardInfo WHERE 
+	if where != "" {
+		where = where + " AND"
+	}
+	sql := `SELECT TOP ` + fmt.Sprintf("%d", limit) + ` * FROM CardInfo WHERE ` + where + ` 
 		(Card_tid NOT IN (SELECT TOP ` + fmt.Sprintf("%d", page) + ` Card_tid FROM CardInfo ORDER BY Card_tid)) 
 		ORDER BY Card_tid`
 	result := e.Raw(sql).Find(&temp)
@@ -55,6 +58,15 @@ func (e *MemberInfo) GetMembers(page int, limit int) (temp []MemberInfo, er erro
 	} else {
 		return nil, fmt.Errorf("查询失败未找到用户信息")
 	}
+}
+
+// 用户总数
+func (e *MemberInfo) MemberNums(where string) int64 {
+	var count int64
+	sql := `SELECT COUNT(*) FROM CardInfo where 1=1 AND ` + where
+	e.Raw(sql).Count(&count)
+	fmt.Println(count)
+	return count
 }
 
 // // 查询（根据关键词模糊查询）

@@ -103,7 +103,7 @@ func (h *Smv1) Run(list_key string, secret string, order_config interface{}) {
 		default:
 			h.RedisClient = redis_factory.GetOneRedisClient()
 			redisClient := h.RedisClient
-			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 0))
+			res, err := redisClient.Bytes(redisClient.Execute("BRPOPLPUSH", list_key, list_key+"Backups", 30))
 			if err != nil {
 				fmt.Println("读取新订单列表数据", err)
 				continue
@@ -113,11 +113,12 @@ func (h *Smv1) Run(list_key string, secret string, order_config interface{}) {
 		}
 	}
 }
+
 func (h *Smv1) BadOrderProcess(bad_order model.Payorder, err_msg error) {
 	redisClient := h.RedisClient
 	bad_order.Error = err_msg.Error()
 	bad, _ := json.Marshal(bad_order)
-	redisClient.Int64(redisClient.Execute("LPUSH", h.List_key+"Bad", string(bad)))
+	redisClient.Int64(redisClient.Execute("LPUSH", "BadOrder", string(bad)))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key, 0, h.Order))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key+"OrderFail", 0, h.Order))
 	redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, h.Order))
@@ -129,22 +130,24 @@ func (h *Smv1) FailOrderProcess() {
 		select {
 		case fail_order := <-h.FailCope:
 			fmt.Println("尝试处理异常订单...", fail_order)
-			redisClient := redis_factory.GetOneRedisClient()
-			_, err := redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, fail_order))
-			if err != nil {
-				fmt.Println("从备份里取出异常订单", err)
-				continue
-			}
-			_, err = redisClient.Int64(redisClient.Execute("LREM", h.List_key+"OrderFail", 0, fail_order))
-			if err != nil {
-				fmt.Println("取出异常订单", err)
-				continue
-			}
+
 			order := model.Payorder{}
 			if err := json.Unmarshal([]byte(fail_order), &order); err != nil {
 				fmt.Println("异常订单序列化失败", err)
 				h.BadOrderProcess(order, err)
-				continue
+			}
+
+			redisClient := redis_factory.GetOneRedisClient()
+			// defer
+			_, err := redisClient.Int64(redisClient.Execute("LREM", h.List_key+"Backups", 0, fail_order))
+			if err != nil {
+				fmt.Println("从备份里取出异常订单", err)
+				h.BadOrderProcess(order, err)
+			}
+			_, err = redisClient.Int64(redisClient.Execute("LREM", h.List_key+"OrderFail", 0, fail_order))
+			if err != nil {
+				fmt.Println("取出异常订单", err)
+				h.BadOrderProcess(order, err)
 			}
 
 			order.Resend = order.Resend + 1
@@ -152,8 +155,7 @@ func (h *Smv1) FailOrderProcess() {
 			new_fail_order_str, _ := json.Marshal(order)
 			_, err = redisClient.Int64(redisClient.Execute("RPUSH", h.List_key, new_fail_order_str))
 			if err != nil {
-				fmt.Println("将异常订单重新加入列表", err)
-				continue
+				fmt.Println("异常订单重新加入列表失败", err)
 			}
 			redisClient.ReleaseOneRedisClient()
 		}

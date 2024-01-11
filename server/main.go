@@ -13,5 +13,6 @@ func main() {
 	global.H_REDIS = core.Redis() //Redis
 	db, _ := global.H_DB.DB()
 	defer db.Close()
-	service.Run()
+	// service.Run()
+	(&service.DelyTask{}).Run()
 }

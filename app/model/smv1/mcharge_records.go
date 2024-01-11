@@ -2,6 +2,7 @@ package smv1
 
 import (
 	"fmt"
+	"goskeleton/app/global/variable"
 	"goskeleton/app/model"
 	"strconv"
 	"time"
@@ -61,7 +62,7 @@ func (MChargeRecords) TableName() string {
 
 // 查询（根据关键词模糊查询）
 func (m *MChargeRecords) List(empID string, Stime string, Etime string) (temp []MChargeRecords) {
-	sql := `SELECT top 50 *
+	sql := `SELECT top 300 *
 FROM MChargeRecords JOIN Clocks
 ON MChargeRecords.clock_id = Clocks.Clock_id
 JOIN DinRoom
@@ -77,7 +78,7 @@ ORDER BY MChargeRecords.ID DESC`
 }
 
 func (m *MChargeRecords) GetOrder(empID string, Oid string) (temp []MChargeRecords) {
-	sql := `SELECT top 50 *
+	sql := `SELECT top 300 *
 FROM MChargeRecords JOIN Clocks
 ON MChargeRecords.clock_id = Clocks.Clock_id
 JOIN DinRoom
@@ -98,20 +99,23 @@ func (rs *MChargeRecords) Add(payorder model.Payorder) error { //充值
 	dealtime := time.Unix(payorder.Dealtime, 0)
 	createtime := time.Unix(payorder.Created_at, 0)
 	var money, _ = strconv.ParseFloat(payorder.Price, 64)
+	//增款===============================================
 	var blance = employee.AfterPay + money
+	//===================================================
 	var chargeData = MChargeRecords{
-		Clockid:   payorder.Macid,
-		Empid:     payorder.Studentid,
-		Opdate:    dealtime.Format("2006-01-02 15:04:05"),
-		GetTime:   createtime.Format("2006-01-02 15:04:05"),
-		CardSequ:  employee.CardSequ + 1,
-		Money:     money,
-		Balance:   blance,
-		Kind:      "6",
-		Cardid:    payorder.Orderid,
-		Accountid: employee.Accountid,
-		OpUser:    payorder.From,
-		Remark:    payorder.From,
+		Clockid:    payorder.Macid,
+		Empid:      payorder.Studentid,
+		Opdate:     dealtime.Format("2006-01-02 15:04:05"),
+		GetTime:    createtime.Format("2006-01-02 15:04:05"),
+		CardSequ:   employee.CardSequ + 1,
+		Money:      money,
+		Balance:    blance,
+		Kind:       variable.ConfigYml.GetString("Order.ChargeKind"),
+		ChargeKind: variable.ConfigYml.GetString("Order.ChargeKind"),
+		Cardid:     payorder.Orderid,
+		Accountid:  employee.Accountid,
+		OpUser:     payorder.From,
+		Remark:     payorder.From,
 	}
 
 	result := rs.Omit("operate_type", "ID", "updated_at", "created_at", "Clock_name", "din_room_name").Create(&chargeData)

@@ -58,6 +58,31 @@ func (e *Employee) Employee(key string) (*Employee, error) {
 	}
 }
 
+// 模糊查询2
+func (e *Employee) GetMembers(page int64, limit int64, where string) (temp *[]Employee, er error) {
+	page = page * limit
+	if where != "" {
+		where = where + " AND"
+	}
+	sql := `SELECT TOP ` + fmt.Sprintf("%d", limit) + ` * FROM Employee WHERE ` + where + ` 
+		(emp_id NOT IN (SELECT TOP ` + fmt.Sprintf("%d", page) + ` emp_id FROM Employee ORDER BY emp_id)) 
+		ORDER BY emp_id`
+	result := e.Raw(sql).Find(&temp)
+	if result.RowsAffected != 0 {
+		return temp, nil
+	} else {
+		return nil, fmt.Errorf("查询失败未找到用户信息")
+	}
+}
+
+// 用户总数
+func (e *Employee) MemberNums(where string) int64 {
+	var count int64
+	sql := `SELECT COUNT(*) FROM Employee where 1=1 AND ` + where
+	e.Raw(sql).Count(&count)
+	return count
+}
+
 func (rs *Employee) UpdateEmployee(empID int, blance float64, sq int) {
 	result := rs.Model(&rs).Where("emp_id = ?", empID).Updates(&Employee{
 		AfterPay: blance,
